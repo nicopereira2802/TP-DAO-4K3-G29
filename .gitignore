@@ -1,0 +1,38 @@
+# --- Carpetas compiladas Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Entornos virtuales ---
+venv/
+env/
+.venv/
+
+# --- Configuración del sistema ---
+.DS_Store
+Thumbs.db
+
+# --- Configuración IDE ---
+# VSCode
+.vscode/
+
+# PyCharm / IntelliJ
+.idea/
+
+# --- Archivos temporales ---
+*.log
+*.tmp
+
+# --- Archivos de Tkinter / PIL ---
+*.png~
+*.bak
+
+# --- Archivos generados para debugging ---
+debug_*.py
+test_*.py
+
+# --- Scripts que NO deben subirse ---
+init_empleados.py
+crear_admin.py
+ver_tabla_empleados.py
