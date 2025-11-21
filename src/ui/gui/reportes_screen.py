@@ -8,6 +8,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from src.reports import reportes_tablas as rpt
 from src.reports import reportes_graficos as rpt_g
 from src.reports import reportes_export as rpt_x
+from src.services.reporte_service import ReporteService
+from src.repositories.cliente_repository import ClienteRepository
+from src.repositories.vehiculo_repository import VehiculoRepository
 
 
 class ReportesScreen(ttk.Frame):
@@ -17,6 +20,7 @@ class ReportesScreen(ttk.Frame):
 
         self._configurar_estilos()
         self._construir_ui()
+        self._cargar_clientes_combo()
 
     def _configurar_estilos(self):
         style = ttk.Style()
@@ -39,7 +43,7 @@ class ReportesScreen(ttk.Frame):
 
         ttk.Label(
             header,
-            text="Consultas sobre alquileres, incidentes y estado de la flota.",
+            text="Reportes de alquileres, facturación y estado de la flota.",
             style="RepSubtitle.TLabel",
         ).grid(row=1, column=0, sticky="w")
 
@@ -52,9 +56,11 @@ class ReportesScreen(ttk.Frame):
         body.columnconfigure(1, weight=1)
         body.rowconfigure(0, weight=1)
 
+        # ----------------- PANEL IZQUIERDO: FILTROS -----------------
         filtros = ttk.LabelFrame(body, text="Filtros", padding=10)
         filtros.grid(row=0, column=0, sticky="nsw", padx=(0, 15))
 
+        # Rango de fechas
         ttk.Label(filtros, text="Fecha desde:").grid(row=0, column=0, sticky="w")
         self.date_desde = DateEntry(
             filtros,
@@ -75,82 +81,120 @@ class ReportesScreen(ttk.Frame):
         self.date_hasta.set_date(date.today())
         self.date_hasta.grid(row=3, column=0, sticky="w", pady=(0, 8))
 
+        # Cliente para "alquileres por cliente"
+        ttk.Label(filtros, text="Cliente (ID - DNI - Nombre):").grid(
+            row=4, column=0, sticky="w"
+        )
+        self.combo_cliente = ttk.Combobox(filtros, state="readonly", width=30)
+        self.combo_cliente.grid(row=5, column=0, sticky="w", pady=(0, 4))
+
+        ttk.Button(
+            filtros,
+            text="Alquileres por cliente",
+            command=self._mostrar_alquileres_por_cliente,
+            width=22,
+        ).grid(row=6, column=0, pady=(4, 10), sticky="w")
+
+        # Botones de reportes tabulares por período
         btns = ttk.Frame(filtros)
-        btns.grid(row=4, column=0, pady=(10, 0), sticky="w")
+        btns.grid(row=7, column=0, pady=(10, 0), sticky="w")
 
         ttk.Button(
             btns,
-            text="Resumen económico",
-            command=self._mostrar_resumen_economico,
+            text="Alquileres por mes",
+            command=self._mostrar_alquileres_por_mes,
             width=22,
         ).grid(row=0, column=0, pady=2, sticky="w")
+
+        ttk.Button(
+            btns,
+            text="Alquileres por trimestre",
+            command=self._mostrar_alquileres_por_trimestre,
+            width=22,
+        ).grid(row=1, column=0, pady=2, sticky="w")
 
         ttk.Button(
             btns,
             text="Vehículos más alquilados",
             command=self._mostrar_top_vehiculos,
             width=22,
-        ).grid(row=1, column=0, pady=2, sticky="w")
+        ).grid(row=2, column=0, pady=2, sticky="w")
 
         ttk.Button(
             btns,
             text="Clientes con más alquileres",
             command=self._mostrar_top_clientes,
             width=22,
-        ).grid(row=2, column=0, pady=2, sticky="w")
+        ).grid(row=3, column=0, pady=2, sticky="w")
+
+        ttk.Button(
+            btns,
+            text="Resumen económico",
+            command=self._mostrar_resumen_economico,
+            width=22,
+        ).grid(row=4, column=0, pady=2, sticky="w")
 
         ttk.Button(
             btns,
             text="Estado de flota (hoy)",
             command=self._mostrar_estado_flota,
             width=22,
-        ).grid(row=3, column=0, pady=8, sticky="w")
+        ).grid(row=5, column=0, pady=8, sticky="w")
 
+        # Sección de gráficos
         ttk.Label(
             filtros,
             text="Gráficos",
             font=("Segoe UI", 10, "bold"),
-        ).grid(row=5, column=0, sticky="w", pady=(12, 2))
+        ).grid(row=8, column=0, sticky="w", pady=(12, 2))
 
         btns_g = ttk.Frame(filtros)
-        btns_g.grid(row=6, column=0, pady=(2, 0), sticky="w")
+        btns_g.grid(row=9, column=0, pady=(2, 0), sticky="w")
+
+        ttk.Button(
+            btns_g,
+            text="Gráfico facturación mensual",
+            command=self._grafico_facturacion_mensual,
+            width=22,
+        ).grid(row=0, column=0, pady=2, sticky="w")
 
         ttk.Button(
             btns_g,
             text="Gráfico resumen econ.",
             command=self._grafico_resumen_economico,
             width=22,
-        ).grid(row=0, column=0, pady=2, sticky="w")
+        ).grid(row=1, column=0, pady=2, sticky="w")
 
         ttk.Button(
             btns_g,
             text="Gráfico top vehículos",
             command=self._grafico_top_vehiculos,
             width=22,
-        ).grid(row=1, column=0, pady=2, sticky="w")
+        ).grid(row=2, column=0, pady=2, sticky="w")
 
         ttk.Button(
             btns_g,
             text="Gráfico top clientes",
             command=self._grafico_top_clientes,
             width=22,
-        ).grid(row=2, column=0, pady=2, sticky="w")
+        ).grid(row=3, column=0, pady=2, sticky="w")
 
         ttk.Button(
             btns_g,
             text="Gráfico estado flota",
             command=self._grafico_estado_flota,
             width=22,
-        ).grid(row=3, column=0, pady=2, sticky="w")
+        ).grid(row=4, column=0, pady=2, sticky="w")
 
+        # Exportar a PDF
         ttk.Label(
             filtros,
             text="Exportar a PDF",
             font=("Segoe UI", 10, "bold"),
-        ).grid(row=7, column=0, sticky="w", pady=(12, 2))
+        ).grid(row=10, column=0, sticky="w", pady=(12, 2))
 
         btns_x = ttk.Frame(filtros)
-        btns_x.grid(row=8, column=0, pady=(2, 0), sticky="w")
+        btns_x.grid(row=11, column=0, pady=(2, 0), sticky="w")
 
         ttk.Button(
             btns_x,
@@ -180,6 +224,7 @@ class ReportesScreen(ttk.Frame):
             width=22,
         ).grid(row=3, column=0, pady=2, sticky="w")
 
+        # ----------------- PANEL DERECHO: RESULTADOS -----------------
         resultados = ttk.Frame(body)
         resultados.grid(row=0, column=1, sticky="nsew")
         resultados.rowconfigure(1, weight=1)
@@ -213,6 +258,33 @@ class ReportesScreen(ttk.Frame):
         )
         self.tree.configure(yscrollcommand=scroll_y.set)
         scroll_y.grid(row=0, column=1, sticky="ns")
+
+    # --------------------------------------------------------------
+    # Helpers de datos
+    # --------------------------------------------------------------
+    def _cargar_clientes_combo(self):
+        """
+        Llena el combo de clientes activos.
+        Formato: "id - DNI - Nombre Apellido"
+        """
+        try:
+            clientes = ClienteRepository.listar()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudieron cargar clientes.\n{e}")
+            clientes = []
+
+        items = []
+        for c in clientes:
+            if not getattr(c, "activo", True):
+                continue
+            cid = getattr(c, "id", None)
+            dni = getattr(c, "dni", "")
+            nombre = getattr(c, "nombre", "")
+            apellido = getattr(c, "apellido", "")
+            etiqueta = f"{cid} - {dni} - {nombre} {apellido}".strip()
+            items.append(etiqueta)
+
+        self.combo_cliente["values"] = items
 
     def _limpiar_resumen_labels(self):
         self.lbl_resumen_1.config(text="")
@@ -263,6 +335,9 @@ class ReportesScreen(ttk.Frame):
         widget = canvas.get_tk_widget()
         widget.pack(fill="both", expand=True)
 
+    # --------------------------------------------------------------
+    # Reportes TABULARES
+    # --------------------------------------------------------------
     def _mostrar_resumen_economico(self):
         f_desde, f_hasta = self._obtener_rango_fechas()
         if not f_desde:
@@ -413,6 +488,144 @@ class ReportesScreen(ttk.Frame):
                 ),
             )
 
+    def _mostrar_alquileres_por_cliente(self):
+        cliente_sel = self.combo_cliente.get().strip()
+        if not cliente_sel:
+            messagebox.showwarning("Validación", "Seleccioná un cliente.")
+            return
+
+        try:
+            id_cliente = int(cliente_sel.split(" - ")[0])
+        except (ValueError, IndexError):
+            messagebox.showwarning("Validación", "No se pudo interpretar el cliente seleccionado.")
+            return
+
+        ok, alquileres_o_msg = ReporteService.alquileres_por_cliente(id_cliente)
+        if not ok:
+            messagebox.showerror("Error", alquileres_o_msg)
+            return
+
+        alquileres = alquileres_o_msg
+
+        self._configurar_tabla(
+            [
+                {"id": "id_alquiler", "text": "ID", "width": 60, "anchor": "center"},
+                {"id": "fecha_inicio", "text": "Inicio", "width": 90, "anchor": "center"},
+                {"id": "fecha_fin", "text": "Fin", "width": 90, "anchor": "center"},
+                {"id": "vehiculo", "text": "Vehículo", "width": 220, "anchor": "w"},
+                {"id": "estado", "text": "Estado", "width": 90, "anchor": "center"},
+                {"id": "total", "text": "Total $", "width": 100, "anchor": "e"},
+            ]
+        )
+
+        self._limpiar_resumen_labels()
+        self.lbl_resumen_1.config(
+            text=f"Alquileres del {cliente_sel}"
+        )
+
+        for a in alquileres:
+            v = VehiculoRepository.obtener_por_id(a.id_vehiculo)
+            if v is not None:
+                txt_veh = f"{v.patente} ({v.marca} {v.modelo})"
+            else:
+                txt_veh = f"Vehículo {a.id_vehiculo}"
+
+            total = getattr(a, "total", 0.0) or 0.0
+            try:
+                total_txt = f"{float(total):.2f}"
+            except (TypeError, ValueError):
+                total_txt = str(total) if total is not None else ""
+
+            self.tree.insert(
+                "",
+                "end",
+                values=(
+                    a.id_alquiler,
+                    a.fecha_inicio,
+                    a.fecha_fin,
+                    txt_veh,
+                    a.estado,
+                    total_txt,
+                ),
+            )
+
+    def _mostrar_alquileres_por_mes(self):
+        f_desde, f_hasta = self._obtener_rango_fechas()
+        if not f_desde:
+            return
+
+        ok, filas_o_msg = rpt.obtener_alquileres_por_mes(f_desde, f_hasta)
+        if not ok:
+            messagebox.showerror("Error", filas_o_msg)
+            return
+
+        filas = filas_o_msg
+
+        self._configurar_tabla(
+            [
+                {"id": "periodo", "text": "Mes (AAAA-MM)", "width": 120, "anchor": "center"},
+                {"id": "cantidad", "text": "Cant. alquileres", "width": 120, "anchor": "center"},
+                {"id": "total", "text": "Total facturado $", "width": 140, "anchor": "e"},
+            ]
+        )
+
+        self._limpiar_resumen_labels()
+        self.lbl_resumen_1.config(
+            text=f"Alquileres por mes ({f_desde} a {f_hasta})"
+        )
+
+        for row in filas:
+            self.tree.insert(
+                "",
+                "end",
+                values=(
+                    row["periodo"],
+                    row["cantidad"],
+                    f"{row['total']:.2f}",
+                ),
+            )
+
+    def _mostrar_alquileres_por_trimestre(self):
+        f_desde, f_hasta = self._obtener_rango_fechas()
+        if not f_desde:
+            return
+
+        ok, filas_o_msg = rpt.obtener_alquileres_por_trimestre(f_desde, f_hasta)
+        if not ok:
+            messagebox.showerror("Error", filas_o_msg)
+            return
+
+        filas = filas_o_msg
+
+        self._configurar_tabla(
+            [
+                {"id": "anio", "text": "Año", "width": 70, "anchor": "center"},
+                {"id": "trimestre", "text": "Trimestre", "width": 90, "anchor": "center"},
+                {"id": "cantidad", "text": "Cant. alquileres", "width": 120, "anchor": "center"},
+                {"id": "total", "text": "Total facturado $", "width": 140, "anchor": "e"},
+            ]
+        )
+
+        self._limpiar_resumen_labels()
+        self.lbl_resumen_1.config(
+            text=f"Alquileres por trimestre ({f_desde} a {f_hasta})"
+        )
+
+        for row in filas:
+            self.tree.insert(
+                "",
+                "end",
+                values=(
+                    row["anio"],
+                    row["trimestre"],
+                    row["cantidad"],
+                    f"{row['total']:.2f}",
+                ),
+            )
+
+    # --------------------------------------------------------------
+    # GRÁFICOS
+    # --------------------------------------------------------------
     def _grafico_resumen_economico(self):
         f_desde, f_hasta = self._obtener_rango_fechas()
         if not f_desde:
@@ -459,6 +672,21 @@ class ReportesScreen(ttk.Frame):
 
         self._mostrar_figura(fig_o_msg, "Gráfico - Estado de la flota")
 
+    def _grafico_facturacion_mensual(self):
+        f_desde, f_hasta = self._obtener_rango_fechas()
+        if not f_desde:
+            return
+
+        ok, fig_o_msg = rpt_g.grafico_facturacion_mensual(f_desde, f_hasta)
+        if not ok:
+            messagebox.showinfo("Información", fig_o_msg)
+            return
+
+        self._mostrar_figura(fig_o_msg, "Gráfico - Facturación mensual")
+
+    # --------------------------------------------------------------
+    # EXPORT PDF
+    # --------------------------------------------------------------
     def _elegir_ruta_pdf(self, nombre_sugerido):
         ruta = filedialog.asksaveasfilename(
             title="Guardar reporte en PDF",

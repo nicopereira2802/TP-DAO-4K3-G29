@@ -21,8 +21,9 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Alquiler de Vehículos")
-        self.geometry("1100x650")
-        self.resizable(False, False)
+        self.geometry("1100x700")
+        self.minsize(1100, 650)
+        self.resizable(True, True)
 
         self._usuario_logueado = None
 

@@ -21,9 +21,11 @@ class VehiculoRepository:
                     tipo,
                     precio_por_dia,
                     activo,
-                    estado
+                    estado,
+                    km_actual,
+                    combustible_actual
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     vehiculo.patente,
@@ -34,6 +36,8 @@ class VehiculoRepository:
                     vehiculo.precio_por_dia,
                     1 if vehiculo.activo else 0,
                     vehiculo.estado or "DISPONIBLE",
+                    vehiculo.km_actual,
+                    vehiculo.combustible_actual,
                 ),
             )
             conn.commit()
@@ -52,7 +56,11 @@ class VehiculoRepository:
 
             vehiculos = []
             for f in filas:
+                # Compatibilidad con BDs viejas
                 estado = f[8] if len(f) > 8 else "DISPONIBLE"
+                km_actual = f[9] if len(f) > 9 else 0
+                combustible_actual = f[10] if len(f) > 10 else 0.0
+
                 vehiculos.append(
                     Vehiculo(
                         id_vehiculo=f[0],
@@ -64,6 +72,8 @@ class VehiculoRepository:
                         precio_por_dia=f[6],
                         activo=bool(f[7]),
                         estado=estado,
+                        km_actual=km_actual,
+                        combustible_actual=combustible_actual,
                     )
                 )
             return vehiculos
@@ -82,6 +92,8 @@ class VehiculoRepository:
                 return None
 
             estado = f[8] if len(f) > 8 else "DISPONIBLE"
+            km_actual = f[9] if len(f) > 9 else 0
+            combustible_actual = f[10] if len(f) > 10 else 0.0
 
             return Vehiculo(
                 id_vehiculo=f[0],
@@ -93,6 +105,8 @@ class VehiculoRepository:
                 precio_por_dia=f[6],
                 activo=bool(f[7]),
                 estado=estado,
+                km_actual=km_actual,
+                combustible_actual=combustible_actual,
             )
         finally:
             conn.close()
@@ -111,6 +125,8 @@ class VehiculoRepository:
                 return None
 
             estado = f[8] if len(f) > 8 else "DISPONIBLE"
+            km_actual = f[9] if len(f) > 9 else 0
+            combustible_actual = f[10] if len(f) > 10 else 0.0
 
             return Vehiculo(
                 id_vehiculo=f[0],
@@ -122,6 +138,8 @@ class VehiculoRepository:
                 precio_por_dia=f[6],
                 activo=bool(f[7]),
                 estado=estado,
+                km_actual=km_actual,
+                combustible_actual=combustible_actual,
             )
         finally:
             conn.close()
@@ -140,7 +158,9 @@ class VehiculoRepository:
                     anio = ?,
                     tipo = ?,
                     precio_por_dia = ?,
-                    estado = ?
+                    estado = ?,
+                    km_actual = ?,
+                    combustible_actual = ?
                 WHERE id_vehiculo = ?
                 """,
                 (
@@ -151,6 +171,8 @@ class VehiculoRepository:
                     vehiculo.tipo,
                     vehiculo.precio_por_dia,
                     vehiculo.estado or "DISPONIBLE",
+                    vehiculo.km_actual,
+                    vehiculo.combustible_actual,
                     vehiculo.id_vehiculo,
                 ),
             )

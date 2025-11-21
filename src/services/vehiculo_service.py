@@ -31,8 +31,18 @@ class VehiculoService:
     # Crear Vehículo
     # ---------------------------------------------------------------
     @staticmethod
-    def crear_vehiculo(usuario_actual, patente, marca, modelo, anio, tipo, precio_por_dia):
-        
+    def crear_vehiculo(
+        usuario_actual,
+        patente,
+        marca,
+        modelo,
+        anio,
+        tipo,
+        precio_por_dia,
+        km_actual,
+        combustible_actual,
+    ):
+
         # Validar rol (usuario_actual es dict)
         if (usuario_actual.get("rol") or "").upper() != "ADMIN":
             return False, "Solo un administrador puede registrar vehículos."
@@ -84,6 +94,23 @@ class VehiculoService:
         if precio_por_dia > 500000:
             return False, "El precio por día es demasiado alto. Ingresá un valor razonable (menor a 500.000)."
 
+        # ---- KM / Combustible ----
+        try:
+            km_actual = float(km_actual)
+        except (TypeError, ValueError):
+            return False, "El kilometraje actual debe ser numérico."
+
+        try:
+            combustible_actual = float(combustible_actual)
+        except (TypeError, ValueError):
+            return False, "El combustible actual debe ser numérico."
+
+        if km_actual < 0:
+            return False, "El kilometraje actual no puede ser negativo."
+
+        if combustible_actual < 0:
+            return False, "El combustible actual no puede ser negativo."
+
         # ---- Crear instancia Vehiculo ----
         vehiculo = Vehiculo(
             id_vehiculo=None,
@@ -93,7 +120,10 @@ class VehiculoService:
             anio=anio,
             tipo=tipo,
             precio_por_dia=precio_por_dia,
-            activo=True
+            activo=True,
+            # estado por defecto "DISPONIBLE" en el modelo
+            km_actual=km_actual,
+            combustible_actual=combustible_actual,
         )
 
         try:
@@ -124,8 +154,18 @@ class VehiculoService:
     # Actualizar
     # ---------------------------------------------------------------
     @staticmethod
-    def actualizar_vehiculo(id_vehiculo, patente, marca, modelo, anio, tipo, precio_por_dia):
-        
+    def actualizar_vehiculo(
+        id_vehiculo,
+        patente,
+        marca,
+        modelo,
+        anio,
+        tipo,
+        precio_por_dia,
+        km_actual,
+        combustible_actual,
+    ):
+
         ok, vehiculo = VehiculoService.obtener_vehiculo_por_id(id_vehiculo)
         if not ok:
             return False, vehiculo
@@ -177,6 +217,23 @@ class VehiculoService:
         if precio_por_dia > 500000:
             return False, "El precio por día es demasiado alto. Ingresá un valor razonable (menor a 500.000)."
 
+        # ---- KM / Combustible ----
+        try:
+            km_actual = float(km_actual)
+        except (TypeError, ValueError):
+            return False, "El kilometraje actual debe ser numérico."
+
+        try:
+            combustible_actual = float(combustible_actual)
+        except (TypeError, ValueError):
+            return False, "El combustible actual debe ser numérico."
+
+        if km_actual < 0:
+            return False, "El kilometraje actual no puede ser negativo."
+
+        if combustible_actual < 0:
+            return False, "El combustible actual no puede ser negativo."
+
         # ---- Aplicar cambios ----
         vehiculo.patente = patente
         vehiculo.marca = marca
@@ -184,6 +241,8 @@ class VehiculoService:
         vehiculo.anio = anio
         vehiculo.tipo = tipo
         vehiculo.precio_por_dia = precio_por_dia
+        vehiculo.km_actual = km_actual
+        vehiculo.combustible_actual = combustible_actual
 
         try:
             VehiculoRepository.actualizar(vehiculo)

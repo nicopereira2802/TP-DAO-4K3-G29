@@ -51,6 +51,16 @@ class VehiculosScreen(ttk.Frame):
             return True
         return valor.isdigit()
 
+    def _validar_float(self, valor):
+        """Permitir solo números reales positivos."""
+        if valor == "":
+            return True
+        try:
+            float(valor)
+            return True
+        except:
+            return False
+
     # ---------------------------------------------------------
     def _construir_ui(self):
         self.rowconfigure(1, weight=1)
@@ -141,15 +151,37 @@ class VehiculosScreen(ttk.Frame):
         )
         self.entry_precio.grid(row=11, column=0, sticky="w", pady=(0, 8))
 
+        # KM ACTUAL
+        ttk.Label(form, text="KM actual:").grid(row=12, column=0, sticky="w")
+        vcmd_km = (self.register(self._validar_float), "%P")
+        self.entry_km = ttk.Entry(
+            form,
+            width=20,
+            validate="key",
+            validatecommand=vcmd_km
+        )
+        self.entry_km.grid(row=13, column=0, sticky="w", pady=(0, 8))
+
+        # COMBUSTIBLE ACTUAL
+        ttk.Label(form, text="Combustible actual (L):").grid(row=14, column=0, sticky="w")
+        vcmd_comb = (self.register(self._validar_float), "%P")
+        self.entry_comb = ttk.Entry(
+            form,
+            width=20,
+            validate="key",
+            validatecommand=vcmd_comb
+        )
+        self.entry_comb.grid(row=15, column=0, sticky="w", pady=(0, 8))
+
         # ACTIVO
         self.var_activo = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             form, text="Vehículo activo", variable=self.var_activo
-        ).grid(row=12, column=0, sticky="w", pady=(5, 10))
+        ).grid(row=16, column=0, sticky="w", pady=(5, 10))
 
         # BOTONES
         btns = ttk.Frame(form)
-        btns.grid(row=13, column=0, pady=(10, 0), sticky="w")
+        btns.grid(row=17, column=0, pady=(10, 0), sticky="w")
 
         ttk.Button(btns, text="Guardar", command=self._guardar)\
             .grid(row=0, column=0, padx=(0, 5))
@@ -159,7 +191,10 @@ class VehiculosScreen(ttk.Frame):
 
     # ---------------------------------------------------------
     def _crear_tabla(self, tabla_frame):
-        columnas = ("id", "patente", "marca", "modelo", "anio", "tipo", "precio", "activo")
+        columnas = (
+            "id", "patente", "marca", "modelo", "anio",
+            "tipo", "precio", "km", "comb", "alerta", "activo"
+        )
 
         self.tree = ttk.Treeview(
             tabla_frame,
@@ -177,6 +212,9 @@ class VehiculosScreen(ttk.Frame):
         self.tree.heading("anio", text="Año")
         self.tree.heading("tipo", text="Tipo")
         self.tree.heading("precio", text="Precio $/día")
+        self.tree.heading("km", text="KM")
+        self.tree.heading("comb", text="Comb (L)")
+        self.tree.heading("alerta", text="Alerta")
         self.tree.heading("activo", text="Activo")
 
         # COLUMNAS
@@ -187,6 +225,9 @@ class VehiculosScreen(ttk.Frame):
         self.tree.column("anio", width=60, anchor="center")
         self.tree.column("tipo", width=80)
         self.tree.column("precio", width=100, anchor="e")
+        self.tree.column("km", width=80, anchor="e")
+        self.tree.column("comb", width=80, anchor="e")
+        self.tree.column("alerta", width=80, anchor="center")
         self.tree.column("activo", width=60, anchor="center")
 
         self.tree.grid(row=0, column=0, sticky="nsew")
@@ -224,7 +265,14 @@ class VehiculosScreen(ttk.Frame):
         self.entry_precio.delete(0, tk.END)
         self.entry_precio.insert(0, valores[6])
 
-        self.var_activo.set(valores[7] == "Sí")
+        # KM y combustible
+        self.entry_km.delete(0, tk.END)
+        self.entry_km.insert(0, valores[7])
+
+        self.entry_comb.delete(0, tk.END)
+        self.entry_comb.insert(0, valores[8])
+
+        self.var_activo.set(valores[10] == "Sí")
 
     # ---------------------------------------------------------
     def _limpiar_formulario(self):
@@ -236,6 +284,10 @@ class VehiculosScreen(ttk.Frame):
         self.combo_anio.set("")
         self.combo_tipo.set("")
         self.entry_precio.delete(0, tk.END)
+
+        self.entry_km.delete(0, tk.END)
+        self.entry_comb.delete(0, tk.END)
+
         self.var_activo.set(True)
 
         for sel in self.tree.selection():
@@ -249,6 +301,8 @@ class VehiculosScreen(ttk.Frame):
         anio = self.combo_anio.get()
         tipo = self.combo_tipo.get()
         precio = self.entry_precio.get()
+        km = self.entry_km.get()
+        combustible = self.entry_comb.get()
 
         if self._vehiculo_actual_id is None:
             ok, r = VehiculoService.crear_vehiculo(
@@ -258,7 +312,9 @@ class VehiculosScreen(ttk.Frame):
                 modelo,
                 anio,
                 tipo,
-                precio
+                precio,
+                km,
+                combustible
             )
         else:
             ok, r = VehiculoService.actualizar_vehiculo(
@@ -268,7 +324,9 @@ class VehiculosScreen(ttk.Frame):
                 modelo,
                 anio,
                 tipo,
-                precio
+                precio,
+                km,
+                combustible
             )
 
         if not ok:
@@ -308,6 +366,8 @@ class VehiculosScreen(ttk.Frame):
             return
 
         for v in vehiculos:
+            alerta = "⚠ Bajo" if v.combustible_actual < 5 else ""
+
             self.tree.insert(
                 "",
                 "end",
@@ -320,6 +380,9 @@ class VehiculosScreen(ttk.Frame):
                     v.anio,
                     v.tipo,
                     v.precio_por_dia,
+                    v.km_actual,
+                    v.combustible_actual,
+                    alerta,
                     "Sí" if v.activo else "No",
                 )
             )

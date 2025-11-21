@@ -253,7 +253,7 @@ class HomeScreen(ttk.Frame):
             return
 
         card_w = 330
-        card_h = 110
+        card_h = 130  # antes 110, lo subimos para que entren KM y combustible
         h_gap = 25
         v_gap = 25
         top_y = 120
@@ -320,6 +320,25 @@ class HomeScreen(ttk.Frame):
                 text=f"Patente: {v.patente}   •   Estado: Disponible",
                 font=("Segoe UI", 9),
                 fill="#222222",
+                tags=("cards",),
+            )
+
+            # ===== Nueva línea: KM y combustible actual =====
+            km_val = getattr(v, "km_actual", 0) or 0
+            comb_val = getattr(v, "combustible_actual", 0.0) or 0.0
+
+            texto_km_comb = f"KM: {km_val:.0f}   •   Combustible: {comb_val:.1f} L"
+            color_km_comb = "#222222"
+            if comb_val < 5:
+                texto_km_comb += "   •   Combustible bajo"
+                color_km_comb = "#AA0000"
+
+            self.hero.create_text(
+                x0 + 10, y0 + 94,
+                anchor="w",
+                text=texto_km_comb,
+                font=("Segoe UI", 9),
+                fill=color_km_comb,
                 tags=("cards",),
             )
 

@@ -270,7 +270,25 @@ class AlquileresScreen(ttk.Frame):
         # Fecha de devolución = HOY automáticamente
         fecha_dev = date.today().isoformat()
 
-        # Solo pedir monto extra opcional
+        # Pedir KM final
+        km_final_str = simpledialog.askstring(
+            "Kilometraje final",
+            "Ingrese el kilometraje actual del vehículo:"
+        )
+        if km_final_str is None or km_final_str.strip() == "":
+            messagebox.showwarning("Validación", "Debés ingresar el kilometraje final.")
+            return
+
+        # Pedir combustible final
+        combustible_final_str = simpledialog.askstring(
+            "Combustible final",
+            "Ingrese el combustible actual (en litros):"
+        )
+        if combustible_final_str is None or combustible_final_str.strip() == "":
+            messagebox.showwarning("Validación", "Debés ingresar el combustible final.")
+            return
+
+        # Monto extra opcional
         monto_extra = simpledialog.askstring("Extra", "Monto extra (opcional):")
         if not monto_extra:
             monto_extra = "0"
@@ -278,12 +296,26 @@ class AlquileresScreen(ttk.Frame):
         ok, r = AlquilerService.cerrar_alquiler(
             self._alquiler_actual_id,
             fecha_dev,
+            km_final_str,
+            combustible_final_str,
             monto_extra
         )
 
         if not ok:
             messagebox.showerror("Error", r)
             return
+
+        # Aviso de combustible bajo si corresponde
+        try:
+            comb_val = float(combustible_final_str)
+            if comb_val < 5:
+                messagebox.showwarning(
+                    "Combustible bajo",
+                    "El vehículo quedó con poco combustible (menos de 5 litros)."
+                )
+        except Exception:
+            # si falla el parseo acá no pasa nada, ya lo validó el service
+            pass
 
         messagebox.showinfo("OK", "Alquiler cerrado correctamente.")
 

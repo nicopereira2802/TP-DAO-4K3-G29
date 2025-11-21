@@ -293,3 +293,114 @@ def obtener_estado_flota(fecha_ref: str):
         "detalle": detalle,
     }
     return True, data
+
+
+# ---------------------------------------------------------------------
+# 5) ALQUILERES POR MES
+# ---------------------------------------------------------------------
+def obtener_alquileres_por_mes(fecha_desde: str, fecha_hasta: str):
+    """
+    Devuelve (ok, filas_o_msg).
+
+    filas = [
+      {
+        "periodo": "AAAA-MM",
+        "anio": 2025,
+        "mes": 1,
+        "cantidad": 5,
+        "total": 123456.78,
+      },
+      ...
+    ]
+    """
+    if fecha_desde > fecha_hasta:
+        return False, "La fecha DESDE no puede ser mayor que la fecha HASTA."
+
+    alquileres = AlquilerRepository.listar()
+    stats = defaultdict(lambda: {"cantidad": 0, "total": 0.0})
+
+    for a in alquileres:
+        fecha_ini = getattr(a, "fecha_inicio", "") or ""
+        estado = (getattr(a, "estado", "") or "").upper()
+        if estado != "CERRADO":
+            continue
+        if not _en_rango(fecha_ini, fecha_desde, fecha_hasta):
+            continue
+
+        periodo = fecha_ini[:7]  # AAAA-MM
+        stats[periodo]["cantidad"] += 1
+
+        total = getattr(a, "total", 0.0) or 0.0
+        try:
+            stats[periodo]["total"] += float(total)
+        except (TypeError, ValueError):
+            pass
+
+    filas = []
+    for periodo, info in stats.items():
+        try:
+            anio = int(periodo[:4])
+            mes = int(periodo[5:7])
+        except Exception:
+            continue
+
+        filas.append(
+            {
+                "periodo": periodo,
+                "anio": anio,
+                "mes": mes,
+                "cantidad": info["cantidad"],
+                "total": round(info["total"], 2),
+            }
+        )
+
+    filas.sort(key=lambda x: (x["anio"], x["mes"]))
+    return True, filas
+
+
+# ---------------------------------------------------------------------
+# 6) ALQUILERES POR TRIMESTRE
+# ---------------------------------------------------------------------
+def obtener_alquileres_por_trimestre(fecha_desde: str, fecha_hasta: str):
+    """
+    Devuelve (ok, filas_o_msg).
+
+    filas = [
+      {
+        "anio": 2025,
+        "trimestre": 1,
+        "cantidad": 12,
+        "total": 345678.90,
+      },
+      ...
+    ]
+    """
+    ok, filas_mes_o_msg = obtener_alquileres_por_mes(fecha_desde, fecha_hasta)
+    if not ok:
+        return False, filas_mes_o_msg
+
+    filas_mes = filas_mes_o_msg
+    stats = defaultdict(lambda: {"cantidad": 0, "total": 0.0})
+
+    for fila in filas_mes:
+        anio = fila["anio"]
+        mes = fila["mes"]
+        trimestre = (mes - 1) // 3 + 1
+        clave = (anio, trimestre)
+
+        stats[clave]["cantidad"] += fila["cantidad"]
+        stats[clave]["total"] += fila["total"]
+
+    filas_trim = []
+    for (anio, trimestre), info in stats.items():
+        filas_trim.append(
+            {
+                "anio": anio,
+                "trimestre": trimestre,
+                "cantidad": info["cantidad"],
+                "total": round(info["total"], 2),
+            }
+        )
+
+    filas_trim.sort(key=lambda x: (x["anio"], x["trimestre"]))
+    return True, filas_trim

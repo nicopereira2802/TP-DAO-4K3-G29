@@ -50,7 +50,6 @@ def grafico_top_vehiculos(fecha_desde: str, fecha_hasta: str, limite: int = 10):
     etiquetas = [f["vehiculo"] for f in filas]
     valores = [f["cantidad"] for f in filas]
 
-    # opcional: acortar etiquetas
     etiquetas_cortas = [
         e if len(e) <= 20 else e[:17] + "..."
         for e in etiquetas
@@ -141,5 +140,36 @@ def grafico_estado_flota(fecha_ref: str | None = None):
         startangle=90,
     )
     ax.set_title(f"Estado de la flota\n{fecha_ref}")
+
+    return True, fig
+
+
+def grafico_facturacion_mensual(fecha_desde: str, fecha_hasta: str):
+    """
+    Devuelve (ok, fig_o_msg).
+    Gráfico de barras con la facturación mensual (alquileres cerrados)
+    en el período indicado.
+    """
+    ok, filas_o_msg = rpt.obtener_alquileres_por_mes(fecha_desde, fecha_hasta)
+    if not ok:
+        return False, filas_o_msg
+
+    filas = filas_o_msg
+    if not filas:
+        return False, "No hay datos de facturación en ese rango para graficar."
+
+    etiquetas = [f["periodo"] for f in filas]   # 'AAAA-MM'
+    valores = [f["total"] for f in filas]
+
+    fig = Figure(figsize=(8, 4))
+    ax = fig.add_subplot(111)
+
+    x = list(range(len(etiquetas)))
+    ax.bar(x, valores)
+    ax.set_xticks(x)
+    ax.set_xticklabels(etiquetas, rotation=45, ha="right")
+    ax.set_ylabel("Monto $")
+    ax.set_title(f"Facturación mensual\n{fecha_desde} a {fecha_hasta}")
+    ax.grid(axis="y", linestyle="--", alpha=0.5)
 
     return True, fig

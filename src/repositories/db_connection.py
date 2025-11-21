@@ -59,7 +59,9 @@ def init_db():
             tipo            TEXT    NOT NULL,
             precio_por_dia  REAL    NOT NULL,
             activo          INTEGER NOT NULL DEFAULT 1,
-            estado          TEXT    NOT NULL DEFAULT 'DISPONIBLE'
+            estado          TEXT    NOT NULL DEFAULT 'DISPONIBLE',
+            km_actual       REAL    NOT NULL DEFAULT 0,
+            combustible_actual REAL NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS alquileres (
@@ -72,6 +74,10 @@ def init_db():
             precio_por_dia REAL    NOT NULL,
             estado         TEXT    NOT NULL,
             total          REAL    NOT NULL DEFAULT 0,
+            km_inicial     REAL    NOT NULL DEFAULT 0,
+            km_final       REAL,
+            combustible_inicial REAL NOT NULL DEFAULT 0,
+            combustible_final   REAL,
 
             FOREIGN KEY (id_cliente)  REFERENCES clientes(id_cliente),
             FOREIGN KEY (id_vehiculo) REFERENCES vehiculos(id_vehiculo),
@@ -109,6 +115,37 @@ def init_db():
             ON incidentes (id_alquiler);
         """
     )
+
+    # Migraciones para agregar columnas nuevas si la BD ya existía
+    cursor.execute("PRAGMA table_info(vehiculos);")
+    cols_v = [fila[1] for fila in cursor.fetchall()]
+    if "km_actual" not in cols_v:
+        cursor.execute(
+            "ALTER TABLE vehiculos ADD COLUMN km_actual REAL NOT NULL DEFAULT 0;"
+        )
+    if "combustible_actual" not in cols_v:
+        cursor.execute(
+            "ALTER TABLE vehiculos ADD COLUMN combustible_actual REAL NOT NULL DEFAULT 0;"
+        )
+
+    cursor.execute("PRAGMA table_info(alquileres);")
+    cols_a = [fila[1] for fila in cursor.fetchall()]
+    if "km_inicial" not in cols_a:
+        cursor.execute(
+            "ALTER TABLE alquileres ADD COLUMN km_inicial REAL NOT NULL DEFAULT 0;"
+        )
+    if "km_final" not in cols_a:
+        cursor.execute(
+            "ALTER TABLE alquileres ADD COLUMN km_final REAL;"
+        )
+    if "combustible_inicial" not in cols_a:
+        cursor.execute(
+            "ALTER TABLE alquileres ADD COLUMN combustible_inicial REAL NOT NULL DEFAULT 0;"
+        )
+    if "combustible_final" not in cols_a:
+        cursor.execute(
+            "ALTER TABLE alquileres ADD COLUMN combustible_final REAL;"
+        )
 
     conn.commit()
     conn.close()
