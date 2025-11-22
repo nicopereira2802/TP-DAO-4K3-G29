@@ -3,6 +3,8 @@ import re
 
 from src.domain.vehiculo import Vehiculo
 from src.repositories.vehiculo_repository import VehiculoRepository
+# --- IMPORTAMOS LA NUEVA FÁBRICA ---
+from src.domain.vehiculo_factory import VehiculoFactory
 
 
 class VehiculoService:
@@ -28,7 +30,7 @@ class VehiculoService:
         return False
 
     # ---------------------------------------------------------------
-    # Crear Vehículo
+    # Crear Vehículo (AHORA USA FACTORY METHOD)
     # ---------------------------------------------------------------
     @staticmethod
     def crear_vehiculo(
@@ -43,17 +45,16 @@ class VehiculoService:
         combustible_actual,
     ):
 
-        # Validar rol (usuario_actual es dict)
+        # Validar rol
         if (usuario_actual.get("rol") or "").upper() != "ADMIN":
             return False, "Solo un administrador puede registrar vehículos."
 
-        # Limpieza
+        # Limpieza básica
         patente = (patente or "").strip().upper()
         marca = (marca or "").strip()
         modelo = (modelo or "").strip()
-        tipo = (tipo or "").strip().lower()
-
-        # ---- Validación de patente ----
+        
+        # Validaciones de negocio
         if not VehiculoService._patente_valida(patente):
             return False, "La patente no tiene un formato válido (AAA123 o AA123AA)."
 
@@ -64,68 +65,48 @@ class VehiculoService:
         if existente is not None:
             return False, "Ya existe un vehículo con esa patente."
 
-        # ---- Marca / Modelo ----
-        if not marca:
-            return False, "La marca no puede estar vacía."
-        if not modelo:
-            return False, "El modelo no puede estar vacío."
+        if not marca or not modelo:
+            return False, "La marca y el modelo son obligatorios."
 
-        # ---- Año ----
         if not str(anio).isdigit():
             return False, "El año debe ser numérico."
-
         anio = int(anio)
         if anio < 1980 or anio > 2030:
             return False, "El año debe estar entre 1980 y 2030."
 
-        # ---- Tipo ----
-        if tipo not in VehiculoService.TIPOS_VALIDOS:
-            return False, f"Tipo inválido. Debe ser uno de: {', '.join(VehiculoService.TIPOS_VALIDOS)}."
-
-        # ---- Precio ----
+        # Conversiones numéricas
         try:
             precio_por_dia = float(precio_por_dia)
-        except ValueError:
-            return False, "El precio por día debe ser numérico."
-
-        if precio_por_dia <= 0:
-            return False, "El precio por día debe ser mayor que cero."
-
-        if precio_por_dia > 500000:
-            return False, "El precio por día es demasiado alto. Ingresá un valor razonable (menor a 500.000)."
-
-        # ---- KM / Combustible ----
-        try:
             km_actual = float(km_actual)
-        except (TypeError, ValueError):
-            return False, "El kilometraje actual debe ser numérico."
-
-        try:
             combustible_actual = float(combustible_actual)
         except (TypeError, ValueError):
-            return False, "El combustible actual debe ser numérico."
+            return False, "Precio, KM y Combustible deben ser numéricos."
 
-        if km_actual < 0:
-            return False, "El kilometraje actual no puede ser negativo."
+        if precio_por_dia <= 0: return False, "El precio debe ser mayor a cero."
+        if km_actual < 0: return False, "El KM no puede ser negativo."
+        if combustible_actual < 0: return False, "El combustible no puede ser negativo."
 
-        if combustible_actual < 0:
-            return False, "El combustible actual no puede ser negativo."
+        # --- AQUI APLICAMOS EL PATRÓN FACTORY ---
+        # Delegamos la creación del objeto a la fábrica en lugar de hacerlo directo
+        try:
+            vehiculo = VehiculoFactory.get_vehiculo(
+                tipo=tipo,
+                id_vehiculo=None,
+                patente=patente,
+                marca=marca,
+                modelo=modelo,
+                anio=anio,
+                precio_por_dia=precio_por_dia,
+                activo=True,
+                estado="DISPONIBLE",
+                km_actual=km_actual,
+                combustible_actual=combustible_actual,
+            )
+        except ValueError as e:
+            # Si la fábrica rechaza el tipo (ej: "avion"), capturamos el error aquí
+            return False, str(e)
 
-        # ---- Crear instancia Vehiculo ----
-        vehiculo = Vehiculo(
-            id_vehiculo=None,
-            patente=patente,
-            marca=marca,
-            modelo=modelo,
-            anio=anio,
-            tipo=tipo,
-            precio_por_dia=precio_por_dia,
-            activo=True,
-            # estado por defecto "DISPONIBLE" en el modelo
-            km_actual=km_actual,
-            combustible_actual=combustible_actual,
-        )
-
+        # Persistencia
         try:
             vehiculo_creado = VehiculoRepository.crear(vehiculo)
             return True, vehiculo_creado
@@ -175,66 +156,28 @@ class VehiculoService:
         modelo = (modelo or "").strip()
         tipo = (tipo or "").strip().lower()
 
-        # ---- Validación de patente ----
+        # Validaciones de actualización
         if not VehiculoService._patente_valida(patente):
             return False, "La patente no tiene un formato válido."
 
-        if " " in patente:
-            return False, "La patente no debe contener espacios."
-
-        # Evitar duplicados si se cambia la patente
         existente = VehiculoRepository.buscar_por_patente(patente)
         if existente and existente.id_vehiculo != id_vehiculo:
             return False, "Ya existe otro vehículo con esa patente."
 
-        # Marca / Modelo
-        if not marca:
-            return False, "La marca no puede estar vacía."
-        if not modelo:
-            return False, "El modelo no puede estar vacío."
-
-        # Año
-        if not str(anio).isdigit():
-            return False, "El año debe ser numérico."
-
-        anio = int(anio)
-        if anio < 1980 or anio > 2030:
-            return False, "El año debe estar entre 1980 y 2030."
-
-        # Tipo
-        if tipo not in VehiculoService.TIPOS_VALIDOS:
-            return False, f"Tipo inválido. Debe ser uno de: {', '.join(VehiculoService.TIPOS_VALIDOS)}."
-
-        # Precio
+        if not marca or not modelo: return False, "Marca y modelo requeridos."
+        
         try:
+            anio = int(anio)
             precio_por_dia = float(precio_por_dia)
-        except ValueError:
-            return False, "El precio por día debe ser numérico."
-
-        if precio_por_dia <= 0:
-            return False, "El precio por día debe ser mayor que cero."
-
-        if precio_por_dia > 500000:
-            return False, "El precio por día es demasiado alto. Ingresá un valor razonable (menor a 500.000)."
-
-        # ---- KM / Combustible ----
-        try:
             km_actual = float(km_actual)
-        except (TypeError, ValueError):
-            return False, "El kilometraje actual debe ser numérico."
-
-        try:
             combustible_actual = float(combustible_actual)
-        except (TypeError, ValueError):
-            return False, "El combustible actual debe ser numérico."
+        except ValueError:
+            return False, "Datos numéricos inválidos."
 
-        if km_actual < 0:
-            return False, "El kilometraje actual no puede ser negativo."
+        if tipo not in VehiculoService.TIPOS_VALIDOS:
+            return False, "Tipo de vehículo inválido."
 
-        if combustible_actual < 0:
-            return False, "El combustible actual no puede ser negativo."
-
-        # ---- Aplicar cambios ----
+        # Aplicar cambios
         vehiculo.patente = patente
         vehiculo.marca = marca
         vehiculo.modelo = modelo
@@ -248,7 +191,7 @@ class VehiculoService:
             VehiculoRepository.actualizar(vehiculo)
             return True, vehiculo
         except sqlite3.IntegrityError:
-            return False, "Error al actualizar el vehículo. Puede ser patente duplicada."
+            return False, "Error al actualizar (posible patente duplicada)."
 
     # ---------------------------------------------------------------
     # Baja lógica
@@ -257,7 +200,7 @@ class VehiculoService:
     def inactivar_vehiculo(id_vehiculo):
         vehiculo = VehiculoRepository.obtener_por_id(id_vehiculo)
         if vehiculo is None:
-            return False, "No se encontró un vehículo con ese ID."
+            return False, "No se encontró el vehículo."
 
         if not vehiculo.activo:
             return False, "El vehículo ya está inactivo."

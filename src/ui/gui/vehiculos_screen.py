@@ -1,25 +1,20 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import customtkinter as ctk
 from src.services.vehiculo_service import VehiculoService
 
-# Combobox de marcas predefinidas
+# Listas para los Combobox
 MARCAS = [
-    "Peugeot",
-    "Renault",
-    "Ford",
-    "Volkswagen",
-    "Chevrolet",
-    "Fiat",
-    "Toyota",
-    "Honda",
-    "Nissan",
+    "Peugeot", "Renault", "Ford", "Volkswagen", "Chevrolet", 
+    "Fiat", "Toyota", "Honda", "Nissan", "BMW", "Mercedes-Benz"
 ]
 
+ANOS = [str(a) for a in range(2000, 2026)]
+TIPOS = ["auto", "camioneta", "moto"]
 
-class VehiculosScreen(ttk.Frame):
+class VehiculosScreen(ctk.CTkFrame):
     """
-    Pantalla de gestión de vehículos.
-    Estilo igual a Clientes.
+    Pantalla de gestión de vehículos (Versión Modernizada).
     """
 
     def __init__(self, parent, usuario_actual, on_back=None):
@@ -27,274 +22,240 @@ class VehiculosScreen(ttk.Frame):
 
         self.usuario_actual = usuario_actual
         self.on_back = on_back
-
         self._vehiculo_actual_id = None
 
-        self._configurar_estilos()
+        self._configurar_estilos_treeview()
         self._construir_ui()
         self._cargar_tabla()
 
-    # ---------------------------------------------------------
-    def _configurar_estilos(self):
+    def _configurar_estilos_treeview(self):
+        """Aplica estilo oscuro a la tabla estándar de Tkinter."""
         style = ttk.Style()
-        style.configure("VehiculosTitle.TLabel", font=("Segoe UI", 16, "bold"))
-        style.configure(
-            "VehiculosSubtitle.TLabel",
-            font=("Segoe UI", 10),
-            foreground="#555555"
-        )
+        style.theme_use("default")
+        
+        # Colores para modo oscuro
+        bg_color = "#2b2b2b"
+        text_color = "white"
+        selected_bg = "#1f538d"
+        header_bg = "#3a3a3a"
+        
+        style.configure("Treeview",
+                        background=bg_color,
+                        foreground=text_color,
+                        fieldbackground=bg_color,
+                        borderwidth=0,
+                        rowheight=25)
+        
+        style.map('Treeview', background=[('selected', selected_bg)])
 
-    # ---------------------------------------------------------
-    def _validar_precio(self, valor):
-        """Solo permite números positivos."""
-        if valor == "":
-            return True
-        return valor.isdigit()
+        style.configure("Treeview.Heading",
+                        background=header_bg,
+                        foreground="white",
+                        relief="flat")
+        
+        style.map("Treeview.Heading",
+                  background=[('active', '#565b5e')])
 
-    def _validar_float(self, valor):
-        """Permitir solo números reales positivos."""
-        if valor == "":
-            return True
-        try:
-            float(valor)
-            return True
-        except:
-            return False
-
-    # ---------------------------------------------------------
     def _construir_ui(self):
-        self.rowconfigure(1, weight=1)
-        self.columnconfigure(0, weight=1)
+        # Layout principal
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
-        # ---- HEADER ----
-        header = ttk.Frame(self, padding=(20, 10))
-        header.grid(row=0, column=0, sticky="ew")
-        header.columnconfigure(0, weight=1)
-
-        ttk.Label(header, text="Gestión de vehículos",
-                  style="VehiculosTitle.TLabel").grid(row=0, column=0, sticky="w")
-
-        ttk.Label(header, text="Alta, modificación y baja lógica de vehículos.",
-                  style="VehiculosSubtitle.TLabel").grid(row=1, column=0, sticky="w")
+        # --- HEADER ---
+        header = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
+        
+        title_frame = ctk.CTkFrame(header, fg_color="transparent")
+        title_frame.pack(side="left")
+        
+        ctk.CTkLabel(title_frame, text="Gestión de Flota", 
+                     font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold")).pack(anchor="w")
+        ctk.CTkLabel(title_frame, text="Alta, modificación y control de vehículos", 
+                     text_color="gray").pack(anchor="w")
 
         if self.on_back:
-            ttk.Button(header, text="Volver al panel", command=self.on_back) \
-                .grid(row=0, column=1, rowspan=2, padx=(10, 0), sticky="e")
+            ctk.CTkButton(header, text="Volver", width=80, height=30, 
+                          fg_color="#444", hover_color="#333", 
+                          command=self.on_back).pack(side="right", anchor="center")
 
-        # ---- BODY ----
-        body = ttk.Frame(self, padding=20)
-        body.grid(row=1, column=0, sticky="nsew")
-        body.columnconfigure(1, weight=1)
+        # --- BODY (Split View) ---
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        
+        # Grid interno del cuerpo: Izq (Form) fijo, Der (Tabla) flexible
+        body.grid_columnconfigure(1, weight=1)
+        body.grid_rowconfigure(0, weight=1)
 
-        # FORM
-        form = ttk.LabelFrame(body, text="Datos del vehículo", padding=10)
-        form.grid(row=0, column=0, sticky="nsw", padx=(0, 15))
+        # 1. PANEL IZQUIERDO: FORMULARIO (Scrollable por si hay muchos campos)
+        form_frame = ctk.CTkFrame(body, width=320, corner_radius=10)
+        form_frame.grid(row=0, column=0, sticky="ns", padx=(0, 20))
+        form_frame.grid_propagate(False) # Mantiene el ancho fijo
 
-        self._crear_formulario(form)
+        # Contenido del formulario
+        ctk.CTkLabel(form_frame, text="Datos del Vehículo", 
+                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(15, 10))
 
-        # TABLA
-        tabla_frame = ttk.LabelFrame(body, text="Listado de vehículos", padding=10)
-        tabla_frame.grid(row=0, column=1, sticky="nsew")
-        tabla_frame.rowconfigure(0, weight=1)
-        tabla_frame.columnconfigure(0, weight=1)
+        # Scrollable interno para los campos si la pantalla es chica
+        scroll_form = ctk.CTkScrollableFrame(form_frame, fg_color="transparent")
+        scroll_form.pack(fill="both", expand=True, padx=5, pady=5)
 
-        self._crear_tabla(tabla_frame)
+        self.entry_patente = ctk.CTkEntry(scroll_form, placeholder_text="Patente (Ej: AA123BB)")
+        self.entry_patente.pack(fill="x", padx=5, pady=5)
 
-    # ---------------------------------------------------------
-    def _crear_formulario(self, form):
+        self.combo_marca = ctk.CTkComboBox(scroll_form, values=MARCAS)
+        self.combo_marca.set("Seleccionar Marca") # Placeholder
+        self.combo_marca.pack(fill="x", padx=5, pady=5)
 
-        # PATENTE
-        ttk.Label(form, text="Patente:").grid(row=0, column=0, sticky="w")
-        self.entry_patente = ttk.Entry(form, width=20)
-        self.entry_patente.grid(row=1, column=0, sticky="w", pady=(0, 8))
+        self.entry_modelo = ctk.CTkEntry(scroll_form, placeholder_text="Modelo")
+        self.entry_modelo.pack(fill="x", padx=5, pady=5)
 
-        # MARCA
-        ttk.Label(form, text="Marca:").grid(row=2, column=0, sticky="w")
-        self.combo_marca = ttk.Combobox(
-            form, values=MARCAS, state="readonly", width=18
-        )
-        self.combo_marca.grid(row=3, column=0, sticky="w", pady=(0, 8))
+        self.combo_anio = ctk.CTkComboBox(scroll_form, values=ANOS)
+        self.combo_anio.set("Año")
+        self.combo_anio.pack(fill="x", padx=5, pady=5)
 
-        # MODELO
-        ttk.Label(form, text="Modelo:").grid(row=4, column=0, sticky="w")
-        self.entry_modelo = ttk.Entry(form, width=20)
-        self.entry_modelo.grid(row=5, column=0, sticky="w", pady=(0, 8))
+        self.combo_tipo = ctk.CTkComboBox(scroll_form, values=TIPOS)
+        self.combo_tipo.set("Tipo de Vehículo")
+        self.combo_tipo.pack(fill="x", padx=5, pady=5)
 
-        # AÑO
-        ttk.Label(form, text="Año:").grid(row=6, column=0, sticky="w")
-        self.combo_anio = ttk.Combobox(
-            form,
-            values=[str(a) for a in range(2000, 2026)],
-            state="readonly",
-            width=18
-        )
-        self.combo_anio.grid(row=7, column=0, sticky="w", pady=(0, 8))
+        self.entry_precio = ctk.CTkEntry(scroll_form, placeholder_text="Precio por día ($)")
+        self.entry_precio.pack(fill="x", padx=5, pady=5)
 
-        # TIPO
-        ttk.Label(form, text="Tipo:").grid(row=8, column=0, sticky="w")
-        self.combo_tipo = ttk.Combobox(
-            form,
-            values=["auto", "camioneta", "moto"],
-            state="readonly",
-            width=18
-        )
-        self.combo_tipo.grid(row=9, column=0, sticky="w", pady=(0, 8))
+        self.entry_km = ctk.CTkEntry(scroll_form, placeholder_text="Kilometraje Actual")
+        self.entry_km.pack(fill="x", padx=5, pady=5)
 
-        # PRECIO POR DIA
-        ttk.Label(form, text="Precio por día:").grid(row=10, column=0, sticky="w")
-        vcmd_precio = (self.register(self._validar_precio), "%P")
-        self.entry_precio = ttk.Entry(
-            form,
-            width=20,
-            validate="key",
-            validatecommand=vcmd_precio
-        )
-        self.entry_precio.grid(row=11, column=0, sticky="w", pady=(0, 8))
+        self.entry_comb = ctk.CTkEntry(scroll_form, placeholder_text="Combustible (Litros)")
+        self.entry_comb.pack(fill="x", padx=5, pady=5)
 
-        # KM ACTUAL
-        ttk.Label(form, text="KM actual:").grid(row=12, column=0, sticky="w")
-        vcmd_km = (self.register(self._validar_float), "%P")
-        self.entry_km = ttk.Entry(
-            form,
-            width=20,
-            validate="key",
-            validatecommand=vcmd_km
-        )
-        self.entry_km.grid(row=13, column=0, sticky="w", pady=(0, 8))
-
-        # COMBUSTIBLE ACTUAL
-        ttk.Label(form, text="Combustible actual (L):").grid(row=14, column=0, sticky="w")
-        vcmd_comb = (self.register(self._validar_float), "%P")
-        self.entry_comb = ttk.Entry(
-            form,
-            width=20,
-            validate="key",
-            validatecommand=vcmd_comb
-        )
-        self.entry_comb.grid(row=15, column=0, sticky="w", pady=(0, 8))
-
-        # ACTIVO
         self.var_activo = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            form, text="Vehículo activo", variable=self.var_activo
-        ).grid(row=16, column=0, sticky="w", pady=(5, 10))
+        self.chk_activo = ctk.CTkCheckBox(scroll_form, text="Vehículo Activo", variable=self.var_activo)
+        self.chk_activo.pack(fill="x", padx=5, pady=15)
 
-        # BOTONES
-        btns = ttk.Frame(form)
-        btns.grid(row=17, column=0, pady=(10, 0), sticky="w")
+        # Botones fijos al pie del formulario (fuera del scroll)
+        btns_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        btns_frame.pack(fill="x", padx=10, pady=10)
 
-        ttk.Button(btns, text="Guardar", command=self._guardar)\
-            .grid(row=0, column=0, padx=(0, 5))
+        ctk.CTkButton(btns_frame, text="Guardar", fg_color="#2cc985", hover_color="#25a970", 
+                      font=ctk.CTkFont(weight="bold"),
+                      command=self._guardar).pack(fill="x", pady=5)
+        
+        ctk.CTkButton(btns_frame, text="Desactivar", fg_color="#c0392b", hover_color="#a93226", 
+                      command=self._desactivar).pack(fill="x", pady=5)
+        
+        ctk.CTkButton(btns_frame, text="Limpiar", fg_color="transparent", border_width=1, 
+                      text_color=("gray10", "gray90"),
+                      command=self._limpiar_formulario).pack(fill="x", pady=5)
 
-        ttk.Button(btns, text="Desactivar", command=self._desactivar)\
-            .grid(row=0, column=1, padx=5)
+        # 2. PANEL DERECHO: TABLA
+        tabla_container = ctk.CTkFrame(body, corner_radius=10)
+        tabla_container.grid(row=0, column=1, sticky="nsew")
+        tabla_container.grid_columnconfigure(0, weight=1)
+        tabla_container.grid_rowconfigure(0, weight=1)
 
-    # ---------------------------------------------------------
-    def _crear_tabla(self, tabla_frame):
+        # Columnas
         columnas = (
             "id", "patente", "marca", "modelo", "anio",
             "tipo", "precio", "km", "comb", "alerta", "activo"
         )
+        self.tree = ttk.Treeview(tabla_container, columns=columnas, show="headings", selectmode="browse")
 
-        self.tree = ttk.Treeview(
-            tabla_frame,
-            columns=columnas,
-            show="headings",
-            selectmode="browse",
-            height=15,
-        )
+        # Encabezados
+        headers = {
+            "id": "ID", "patente": "Patente", "marca": "Marca", "modelo": "Modelo",
+            "anio": "Año", "tipo": "Tipo", "precio": "$/día", "km": "KM",
+            "comb": "Lts", "alerta": "Estado", "activo": "Activo"
+        }
+        
+        for col_id, text in headers.items():
+            self.tree.heading(col_id, text=text)
 
-        # HEADERS
-        self.tree.heading("id", text="ID")
-        self.tree.heading("patente", text="Patente")
-        self.tree.heading("marca", text="Marca")
-        self.tree.heading("modelo", text="Modelo")
-        self.tree.heading("anio", text="Año")
-        self.tree.heading("tipo", text="Tipo")
-        self.tree.heading("precio", text="Precio $/día")
-        self.tree.heading("km", text="KM")
-        self.tree.heading("comb", text="Comb (L)")
-        self.tree.heading("alerta", text="Alerta")
-        self.tree.heading("activo", text="Activo")
-
-        # COLUMNAS
+        # Anchos
         self.tree.column("id", width=40, anchor="center")
-        self.tree.column("patente", width=90)
-        self.tree.column("marca", width=120)
-        self.tree.column("modelo", width=120)
+        self.tree.column("patente", width=90, anchor="center")
+        self.tree.column("marca", width=100)
+        self.tree.column("modelo", width=100)
         self.tree.column("anio", width=60, anchor="center")
         self.tree.column("tipo", width=80)
-        self.tree.column("precio", width=100, anchor="e")
+        self.tree.column("precio", width=90, anchor="e")
         self.tree.column("km", width=80, anchor="e")
-        self.tree.column("comb", width=80, anchor="e")
-        self.tree.column("alerta", width=80, anchor="center")
+        self.tree.column("comb", width=60, anchor="e")
+        self.tree.column("alerta", width=80, anchor="center") # Para alertas de combustible
         self.tree.column("activo", width=60, anchor="center")
 
-        self.tree.grid(row=0, column=0, sticky="nsew")
+        self.tree.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        scroll_y = ttk.Scrollbar(
-            tabla_frame, orient="vertical", command=self.tree.yview
-        )
+        # Scrollbar
+        scroll_y = ctk.CTkScrollbar(tabla_container, command=self.tree.yview)
+        scroll_y.grid(row=0, column=1, sticky="ns", pady=10, padx=(0, 5))
         self.tree.configure(yscrollcommand=scroll_y.set)
-        scroll_y.grid(row=0, column=1, sticky="ns")
 
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
     # ---------------------------------------------------------
+    # LÓGICA INTERNA
+    # ---------------------------------------------------------
+
+    def _limpiar_formulario(self):
+        self._vehiculo_actual_id = None
+        
+        self.entry_patente.delete(0, "end")
+        self.entry_modelo.delete(0, "end")
+        self.entry_precio.delete(0, "end")
+        self.entry_km.delete(0, "end")
+        self.entry_comb.delete(0, "end")
+        
+        # Resetear combos a placeholders
+        self.combo_marca.set("Seleccionar Marca")
+        self.combo_anio.set("Año")
+        self.combo_tipo.set("Tipo de Vehículo")
+        
+        self.var_activo.set(True)
+        
+        # Quitar selección de tabla
+        if self.tree.selection():
+            self.tree.selection_remove(self.tree.selection()[0])
+
+    def _cargar_tabla(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        ok, vehiculos = VehiculoService.listar_vehiculos()
+        if not ok: return
+
+        for v in vehiculos:
+            # Alerta visual simple
+            alerta = "⚠ Bajo" if v.combustible_actual < 5 else "OK"
+            if v.estado == "MANTENIMIENTO": alerta = "🔧 Taller"
+            elif v.estado == "ALQUILADO": alerta = "🚗 En uso"
+
+            self.tree.insert("", "end", iid=str(v.id_vehiculo), values=(
+                v.id_vehiculo, v.patente, v.marca, v.modelo, v.anio,
+                v.tipo, f"{v.precio_por_dia:.2f}", f"{v.km_actual:.0f}", 
+                f"{v.combustible_actual:.1f}", alerta,
+                "Sí" if v.activo else "No"
+            ))
+
     def _on_tree_select(self, event):
         sel = self.tree.selection()
-        if not sel:
-            return
+        if not sel: return
 
         item = sel[0]
         valores = self.tree.item(item, "values")
-
         self._vehiculo_actual_id = int(valores[0])
 
-        self.entry_patente.delete(0, tk.END)
-        self.entry_patente.insert(0, valores[1])
-
+        # Rellenar campos
+        self.entry_patente.delete(0, "end"); self.entry_patente.insert(0, valores[1])
         self.combo_marca.set(valores[2])
-
-        self.entry_modelo.delete(0, tk.END)
-        self.entry_modelo.insert(0, valores[3])
-
+        self.entry_modelo.delete(0, "end"); self.entry_modelo.insert(0, valores[3])
         self.combo_anio.set(valores[4])
         self.combo_tipo.set(valores[5])
-
-        self.entry_precio.delete(0, tk.END)
-        self.entry_precio.insert(0, valores[6])
-
-        # KM y combustible
-        self.entry_km.delete(0, tk.END)
-        self.entry_km.insert(0, valores[7])
-
-        self.entry_comb.delete(0, tk.END)
-        self.entry_comb.insert(0, valores[8])
-
+        self.entry_precio.delete(0, "end"); self.entry_precio.insert(0, valores[6])
+        self.entry_km.delete(0, "end"); self.entry_km.insert(0, valores[7])
+        self.entry_comb.delete(0, "end"); self.entry_comb.insert(0, valores[8])
+        
         self.var_activo.set(valores[10] == "Sí")
 
-    # ---------------------------------------------------------
-    def _limpiar_formulario(self):
-        self._vehiculo_actual_id = None
-
-        self.entry_patente.delete(0, tk.END)
-        self.combo_marca.set("")
-        self.entry_modelo.delete(0, tk.END)
-        self.combo_anio.set("")
-        self.combo_tipo.set("")
-        self.entry_precio.delete(0, tk.END)
-
-        self.entry_km.delete(0, tk.END)
-        self.entry_comb.delete(0, tk.END)
-
-        self.var_activo.set(True)
-
-        for sel in self.tree.selection():
-            self.tree.selection_remove(sel)
-
-    # ---------------------------------------------------------
     def _guardar(self):
+        # Obtener valores
         patente = self.entry_patente.get()
         marca = self.combo_marca.get()
         modelo = self.entry_modelo.get()
@@ -302,31 +263,20 @@ class VehiculosScreen(ttk.Frame):
         tipo = self.combo_tipo.get()
         precio = self.entry_precio.get()
         km = self.entry_km.get()
-        combustible = self.entry_comb.get()
+        comb = self.entry_comb.get()
+
+        # Validaciones básicas de UI (Service hace las fuertes)
+        if marca == "Seleccionar Marca" or tipo == "Tipo de Vehículo":
+            messagebox.showwarning("Validación", "Seleccione marca y tipo.")
+            return
 
         if self._vehiculo_actual_id is None:
             ok, r = VehiculoService.crear_vehiculo(
-                self.usuario_actual,
-                patente,
-                marca,
-                modelo,
-                anio,
-                tipo,
-                precio,
-                km,
-                combustible
+                self.usuario_actual, patente, marca, modelo, anio, tipo, precio, km, comb
             )
         else:
             ok, r = VehiculoService.actualizar_vehiculo(
-                self._vehiculo_actual_id,
-                patente,
-                marca,
-                modelo,
-                anio,
-                tipo,
-                precio,
-                km,
-                combustible
+                self._vehiculo_actual_id, patente, marca, modelo, anio, tipo, precio, km, comb
             )
 
         if not ok:
@@ -337,17 +287,14 @@ class VehiculosScreen(ttk.Frame):
         self._limpiar_formulario()
         self._cargar_tabla()
 
-    # ---------------------------------------------------------
     def _desactivar(self):
         if self._vehiculo_actual_id is None:
             messagebox.showwarning("Atención", "Seleccioná un vehículo.")
             return
 
-        if not messagebox.askyesno("Confirmar", "¿Desactivar vehículo?"):
-            return
+        if not messagebox.askyesno("Confirmar", "¿Desactivar vehículo?"): return
 
         ok, r = VehiculoService.inactivar_vehiculo(self._vehiculo_actual_id)
-
         if not ok:
             messagebox.showerror("Error", r)
             return
@@ -355,34 +302,3 @@ class VehiculosScreen(ttk.Frame):
         messagebox.showinfo("OK", "Vehículo desactivado.")
         self._limpiar_formulario()
         self._cargar_tabla()
-
-    # ---------------------------------------------------------
-    def _cargar_tabla(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-
-        ok, vehiculos = VehiculoService.listar_vehiculos()
-        if not ok:
-            return
-
-        for v in vehiculos:
-            alerta = "⚠ Bajo" if v.combustible_actual < 5 else ""
-
-            self.tree.insert(
-                "",
-                "end",
-                iid=str(v.id_vehiculo),
-                values=(
-                    v.id_vehiculo,
-                    v.patente,
-                    v.marca,
-                    v.modelo,
-                    v.anio,
-                    v.tipo,
-                    v.precio_por_dia,
-                    v.km_actual,
-                    v.combustible_actual,
-                    alerta,
-                    "Sí" if v.activo else "No",
-                )
-            )

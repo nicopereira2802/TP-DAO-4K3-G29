@@ -1,6 +1,7 @@
-import tkinter as tk
+import customtkinter as ctk
 from tkinter import ttk
 
+# Importamos las pantallas (asegúrate de que los nombres de archivo coincidan)
 from src.ui.gui.home_screen import HomeScreen
 from src.ui.gui.login_screen import LoginScreen
 from src.ui.gui.dashboard_screen import DashboardScreen
@@ -11,36 +12,53 @@ from src.ui.gui.vehiculos_screen import VehiculosScreen
 from src.ui.gui.alquileres_screen import AlquileresScreen
 from src.ui.gui.incidentes_screen import IncidentesScreen
 from src.ui.gui.mantenimientos_screen import MantenimientosScreen
-
-from src.services.cliente_service import ClienteService
-from src.services.empleado_service import EmpleadoService
 from src.ui.gui.reportes_screen import ReportesScreen
 
+# Importamos los servicios
+from src.services.cliente_service import ClienteService
+from src.services.empleado_service import EmpleadoService
 
-class App(tk.Tk):
+# --- CONFIGURACIÓN GLOBAL DEL TEMA ---
+# Esto aplica el modo oscuro/claro según tu sistema y el color azul por defecto
+ctk.set_appearance_mode("System")  # Opciones: "System" (default), "Dark", "Light"
+ctk.set_default_color_theme("blue")  # Opciones: "blue" (default), "green", "dark-blue"
+
+class App(ctk.CTk):
     def __init__(self):
         super().__init__()
+        
+        # Configuración de la ventana principal
         self.title("Sistema de Alquiler de Vehículos")
         self.geometry("1100x700")
         self.minsize(1100, 650)
         self.resizable(True, True)
 
+        # Estado de la sesión
         self._usuario_logueado = None
 
+        # Instancia global de servicios que se comparten
         self._cliente_service = ClienteService()
         self._empleado_service = EmpleadoService()
 
-        self.container = ttk.Frame(self)
+        # Contenedor principal (ahora es un CTkFrame)
+        self.container = ctk.CTkFrame(self)
         self.container.pack(fill="both", expand=True)
 
         self._frame_actual = None
+        
+        # Iniciar en la pantalla Home
         self.mostrar_home()
 
     def _cambiar_frame(self, nuevo_frame):
+        """Destruye el frame actual y muestra el nuevo."""
         if self._frame_actual is not None:
             self._frame_actual.destroy()
         self._frame_actual = nuevo_frame
         self._frame_actual.pack(fill="both", expand=True)
+
+    # ------------------------------------------------------------------
+    # MÉTODOS DE NAVEGACIÓN (Lógica intacta)
+    # ------------------------------------------------------------------
 
     def mostrar_home(self):
         home = HomeScreen(
@@ -79,6 +97,8 @@ class App(tk.Tk):
     def _on_logout(self):
         self._usuario_logueado = None
         self.mostrar_home()
+
+    # --- Pantallas Específicas ---
 
     def mostrar_clientes(self):
         pantalla = ClientesScreen(
@@ -132,3 +152,7 @@ class App(tk.Tk):
             on_back=self.mostrar_dashboard
         )
         self._cambiar_frame(pantalla)
+
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()

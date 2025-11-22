@@ -1,30 +1,68 @@
 import sqlite3
 from src.config.settings import DB_PATH
 
+class DatabaseConnection:
+    """
+    Implementación del Patrón Singleton.
+    Garantiza una única instancia de conexión a la BD para todo el sistema.
+    """
+    _instance = None
+    _connection = None
 
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(DatabaseConnection, cls).__new__(cls)
+        return cls._instance
+
+    def get_connection(self):
+        """
+        Retorna la conexión activa. Si no existe o se cerró, crea una nueva.
+        """
+        if self._connection is None:
+            try:
+                # check_same_thread=False permite usar la conexión en hilos de GUI si fuera necesario
+                self._connection = sqlite3.connect(DB_PATH, check_same_thread=False)
+                self._connection.execute("PRAGMA foreign_keys = ON;")
+            except sqlite3.Error as e:
+                print(f"Error crítico conectando a BD: {e}")
+                return None
+        return self._connection
+
+    def close_connection(self):
+        """Cierra la conexión explícitamente si es necesario."""
+        if self._connection:
+            self._connection.close()
+            self._connection = None
+
+# -----------------------------------------------------------------------------
+# Función helper global
+# -----------------------------------------------------------------------------
 def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
+    """
+    Función envoltorio para mantener compatibilidad con el resto de los repositorios.
+    En lugar de crear una conexión nueva, pide la instancia al Singleton.
+    """
+    return DatabaseConnection().get_connection()
 
-
+# -----------------------------------------------------------------------------
+# Inicialización de la Base de Datos (Tu lógica original intacta)
+# -----------------------------------------------------------------------------
 def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='empleados';"
-    )
+    # 1. Verificar integridad de la tabla empleados (migración si faltan columnas clave)
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='empleados';")
     existe_empleados = cursor.fetchone() is not None
 
     if existe_empleados:
         cursor.execute("PRAGMA table_info(empleados);")
         cols = [fila[1] for fila in cursor.fetchall()]
-
         columnas_necesarias = {"telefono", "usuario", "password", "rol"}
         if not columnas_necesarias.issubset(set(cols)):
             cursor.execute("DROP TABLE empleados;")
 
+    # 2. Creación de Tablas
     cursor.executescript(
         """
         CREATE TABLE IF NOT EXISTS clientes (
@@ -116,36 +154,24 @@ def init_db():
         """
     )
 
-    # Migraciones para agregar columnas nuevas si la BD ya existía
+    # 3. Migraciones (Agregar columnas nuevas a tablas viejas si hace falta)
     cursor.execute("PRAGMA table_info(vehiculos);")
     cols_v = [fila[1] for fila in cursor.fetchall()]
     if "km_actual" not in cols_v:
-        cursor.execute(
-            "ALTER TABLE vehiculos ADD COLUMN km_actual REAL NOT NULL DEFAULT 0;"
-        )
+        cursor.execute("ALTER TABLE vehiculos ADD COLUMN km_actual REAL NOT NULL DEFAULT 0;")
     if "combustible_actual" not in cols_v:
-        cursor.execute(
-            "ALTER TABLE vehiculos ADD COLUMN combustible_actual REAL NOT NULL DEFAULT 0;"
-        )
+        cursor.execute("ALTER TABLE vehiculos ADD COLUMN combustible_actual REAL NOT NULL DEFAULT 0;")
 
     cursor.execute("PRAGMA table_info(alquileres);")
     cols_a = [fila[1] for fila in cursor.fetchall()]
     if "km_inicial" not in cols_a:
-        cursor.execute(
-            "ALTER TABLE alquileres ADD COLUMN km_inicial REAL NOT NULL DEFAULT 0;"
-        )
+        cursor.execute("ALTER TABLE alquileres ADD COLUMN km_inicial REAL NOT NULL DEFAULT 0;")
     if "km_final" not in cols_a:
-        cursor.execute(
-            "ALTER TABLE alquileres ADD COLUMN km_final REAL;"
-        )
+        cursor.execute("ALTER TABLE alquileres ADD COLUMN km_final REAL;")
     if "combustible_inicial" not in cols_a:
-        cursor.execute(
-            "ALTER TABLE alquileres ADD COLUMN combustible_inicial REAL NOT NULL DEFAULT 0;"
-        )
+        cursor.execute("ALTER TABLE alquileres ADD COLUMN combustible_inicial REAL NOT NULL DEFAULT 0;")
     if "combustible_final" not in cols_a:
-        cursor.execute(
-            "ALTER TABLE alquileres ADD COLUMN combustible_final REAL;"
-        )
+        cursor.execute("ALTER TABLE alquileres ADD COLUMN combustible_final REAL;")
 
     conn.commit()
-    conn.close()
+    # NOTA: No cerramos la conexión aquí porque al ser Singleton queremos que siga viva para la app.

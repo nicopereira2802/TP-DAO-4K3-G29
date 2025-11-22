@@ -1,18 +1,9 @@
 from src.repositories.db_connection import get_connection
 import sqlite3
 
-
 class AuthService:
     """
-    Servicio de autenticación usando la tabla 'empleados'.
-
-    Valida:
-    - que exista un empleado con ese usuario y password
-    - que esté activo
-
-    Devuelve (ok: bool, resultado):
-    - ok = True  -> resultado = dict con info básica del empleado
-    - ok = False -> resultado = mensaje de error para mostrar en la UI
+    Servicio de autenticación.
     """
 
     @staticmethod
@@ -24,6 +15,7 @@ class AuthService:
             return False, "Usuario y contraseña son obligatorios."
 
         try:
+            # Obtenemos la conexión Singleton (NO la cerramos al final)
             conn = get_connection()
             cursor = conn.cursor()
 
@@ -37,32 +29,25 @@ class AuthService:
                 (username, password),
             )
             fila = cursor.fetchone()
-            conn.close()
+            # Eliminamos conn.close()
 
         except sqlite3.OperationalError as e:
-            if "database is locked" in str(e).lower():
-                return False, (
-                    "La base de datos está ocupada en este momento.\n"
-                    "Cerrá otros programas que la estén usando y volvé a intentar."
-                )
-            return False, f"Ocurrió un error al acceder a la base de datos: {e}"
-
+            return False, f"Error de BD: {e}"
         except Exception as e:
-            return False, f"Ocurrió un error inesperado al validar el usuario: {e}"
+            return False, f"Error inesperado: {e}"
 
         if fila is None:
-            # No encontró usuario+password
             return False, "Usuario o contraseña incorrectos."
 
         id_empleado, nombre, apellido, rol, activo = fila
 
         if not activo:
-            return False, "El empleado está inactivo. No puede iniciar sesión."
+            return False, "El empleado está inactivo."
 
         usuario = {
             "id_empleado": id_empleado,
             "username": username,
             "nombre_completo": f"{nombre} {apellido}",
-            "rol": (rol or "").upper(),   # 'ADMIN' o 'EMPLEADO'
+            "rol": (rol or "").upper(),
         }
         return True, usuario

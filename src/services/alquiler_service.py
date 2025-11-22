@@ -192,26 +192,31 @@ class AlquilerService:
         if fecha_devolucion < fecha_inicio:
             return False, "La fecha de devolución no puede ser anterior a la fecha de inicio."
 
-        # Calcular días efectivamente usados (solo para info, no para costo final)
-        dias = (fecha_devolucion - fecha_inicio).days
-        if dias <= 0:
-            dias = 1
+        # --- CORRECCIÓN DE CÁLCULO DE PRECIO ---
+        # 1. Calcular días reales
+        dias_reales = (fecha_devolucion - fecha_inicio).days
+        if dias_reales <= 0:
+            dias_reales = 1 # Se cobra mínimo 1 día
 
-        # Validar monto_extra
-        try:
-            monto_extra = float(monto_extra)
-        except (TypeError, ValueError):
-            return False, "El monto extra debe ser numérico."
-
-        if monto_extra < 0:
-            return False, "El monto extra no puede ser negativo."
-
-        # ✅ Obtener vehículo
+        # 2. Obtener precio del vehículo
         vehiculo = VehiculoRepository.obtener_por_id(alquiler.id_vehiculo)
         if vehiculo is None:
             return False, "No se encontró el vehículo asociado al alquiler."
 
-        # ✅ Validar y parsear km_final / combustible_final
+        # 3. Validar monto extra
+        try:
+            monto_extra = float(monto_extra)
+        except (TypeError, ValueError):
+            return False, "El monto extra debe ser numérico."
+        if monto_extra < 0:
+            return False, "El monto extra no puede ser negativo."
+
+        # 4. CALCULAR TOTAL REAL (Días * Precio + Extra)
+        costo_base = dias_reales * vehiculo.precio_por_dia
+        total = costo_base + monto_extra
+        # ---------------------------------------
+
+        # Validar y parsear km_final / combustible_final
         try:
             km_final = float(km_final)
         except (TypeError, ValueError):
@@ -225,39 +230,25 @@ class AlquilerService:
         if km_final < 0:
             return False, "El KM final no puede ser negativo."
 
-        # km_final no puede ser menor al km_inicial del alquiler
         km_inicial = getattr(alquiler, "km_inicial", 0) or 0
         if km_final < km_inicial:
-            return False, f"El KM final no puede ser menor al KM inicial del alquiler ({km_inicial})."
-
-        # km_final no puede ser menor al km_actual del vehículo
-        km_actual_vehiculo = getattr(vehiculo, "km_actual", 0) or 0
-        if km_final < km_actual_vehiculo:
-            return False, f"El KM final no puede ser menor al KM actual registrado del vehículo ({km_actual_vehiculo})."
+            return False, f"El KM final ({km_final}) no puede ser menor al inicial ({km_inicial})."
 
         if combustible_final < 0:
             return False, "El combustible final no puede ser negativo."
 
-        # ✅ Cálculo de total: solo monto_extra (según lo que me pediste)
-        total = monto_extra
-
-        # Actualizar alquiler en la BD (estado, total, km_final, combustible_final)
+        # Actualizar alquiler en la BD
         alquiler.km_final = km_final
         alquiler.combustible_final = combustible_final
-        alquiler.total = total
+        alquiler.total = total # Ahora sí guarda el total correcto
         alquiler.estado = "CERRADO"
 
-        # Guardar en la BD usando el método que agrega km/combustible
-        # (lo agregamos antes en AlquilerRepository)
         AlquilerRepository.actualizar_cierre(alquiler)
 
-        # ✅ Actualizar vehículo: km_actual, combustible_actual, estado
+        # Actualizar vehículo
         vehiculo.km_actual = km_final
         vehiculo.combustible_actual = combustible_final
         vehiculo.estado = "DISPONIBLE"
         VehiculoRepository.actualizar(vehiculo)
-
-        # Actualizamos el objeto en memoria (por las dudas)
-        # alquiler.estado ya está en "CERRADO" y total seteado
 
         return True, alquiler

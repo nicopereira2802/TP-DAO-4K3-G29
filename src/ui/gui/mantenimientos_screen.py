@@ -2,20 +2,17 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import date
 
-from tkcalendar import DateEntry  # pip install tkcalendar
+# pip install customtkinter tkcalendar
+import customtkinter as ctk
+from tkcalendar import DateEntry
 
 from src.services.mantenimiento_service import MantenimientoService
 from src.repositories.vehiculo_repository import VehiculoRepository
 
 
-class MantenimientosScreen(ttk.Frame):
+class MantenimientosScreen(ctk.CTkFrame):
     """
-    Pantalla de gestión de mantenimientos de vehículos.
-
-    Usa:
-      - MantenimientoService.crear_mantenimiento(...)
-      - MantenimientoService.listar_mantenimientos()
-      - MantenimientoService.eliminar_mantenimiento(...)
+    Pantalla de gestión de mantenimientos (Versión Moderna).
     """
 
     def __init__(self, parent, on_back=None):
@@ -24,129 +21,139 @@ class MantenimientosScreen(ttk.Frame):
 
         self._mantenimiento_actual_id = None
 
-        self._configurar_estilos()
+        self._configurar_estilos_treeview()
         self._construir_ui()
         self._cargar_vehiculos_para_combo()
         self._cargar_mantenimientos_en_tabla()
 
-    # ----------------------------------------------------------
-    def _configurar_estilos(self):
+    def _configurar_estilos_treeview(self):
         style = ttk.Style()
-        style.configure("MantTitle.TLabel", font=("Segoe UI", 16, "bold"))
-        style.configure("MantSubtitle.TLabel", font=("Segoe UI", 10), foreground="#555555")
+        style.theme_use("default")
+        
+        bg_color = "#2b2b2b"
+        text_color = "white"
+        selected_bg = "#1f538d"
+        header_bg = "#3a3a3a"
+        
+        style.configure("Treeview",
+                        background=bg_color,
+                        foreground=text_color,
+                        fieldbackground=bg_color,
+                        borderwidth=0,
+                        rowheight=25)
+        
+        style.map('Treeview', background=[('selected', selected_bg)])
 
-    # ----------------------------------------------------------
+        style.configure("Treeview.Heading",
+                        background=header_bg,
+                        foreground="white",
+                        relief="flat")
+        
+        style.map("Treeview.Heading",
+                  background=[('active', '#565b5e')])
+
     def _construir_ui(self):
-        self.rowconfigure(1, weight=1)
-        self.columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
-        # HEADER
-        header = ttk.Frame(self, padding=(20, 10))
-        header.grid(row=0, column=0, sticky="ew")
-        header.columnconfigure(0, weight=1)
-
-        ttk.Label(
-            header,
-            text="Gestión de mantenimientos",
-            style="MantTitle.TLabel",
-        ).grid(row=0, column=0, sticky="w")
-
-        ttk.Label(
-            header,
-            text="Registrar y administrar mantenimientos de los vehículos.",
-            style="MantSubtitle.TLabel",
-        ).grid(row=1, column=0, sticky="w")
+        # --- HEADER ---
+        header = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
+        
+        title_frame = ctk.CTkFrame(header, fg_color="transparent")
+        title_frame.pack(side="left")
+        
+        ctk.CTkLabel(title_frame, text="Mantenimiento de Flota", 
+                     font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold")).pack(anchor="w")
+        ctk.CTkLabel(title_frame, text="Registro de reparaciones y servicios", 
+                     text_color="gray").pack(anchor="w")
 
         if self.on_back:
-            ttk.Button(header, text="Volver al panel", command=self.on_back) \
-                .grid(row=0, column=1, rowspan=2, padx=(10, 0), sticky="e")
+            ctk.CTkButton(header, text="Volver", width=80, height=30, 
+                          fg_color="#444", hover_color="#333", 
+                          command=self.on_back).pack(side="right", anchor="center")
 
-        # BODY
-        body = ttk.Frame(self, padding=20)
-        body.grid(row=1, column=0, sticky="nsew")
-        body.columnconfigure(1, weight=1)
+        # --- BODY (Split View) ---
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        
+        body.grid_columnconfigure(1, weight=1)
+        body.grid_rowconfigure(0, weight=1)
 
-        # FORM
-        form = ttk.LabelFrame(body, text="Nuevo mantenimiento", padding=10)
-        form.grid(row=0, column=0, sticky="nsw", padx=(0, 15))
+        # 1. PANEL IZQUIERDO: FORMULARIO
+        form_frame = ctk.CTkFrame(body, width=320, corner_radius=10)
+        form_frame.grid(row=0, column=0, sticky="ns", padx=(0, 20))
+        form_frame.grid_propagate(False)
+
+        ctk.CTkLabel(form_frame, text="Nuevo Mantenimiento", 
+                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=15)
 
         # Vehículo
-        ttk.Label(form, text="Vehículo:").grid(row=0, column=0, sticky="w")
-        self.combo_vehiculo = ttk.Combobox(form, state="readonly", width=40)
-        self.combo_vehiculo.grid(row=1, column=0, sticky="w", pady=(0, 8))
+        ctk.CTkLabel(form_frame, text="Vehículo:", anchor="w").pack(fill="x", padx=15, pady=(5,0))
+        self.combo_vehiculo = ctk.CTkComboBox(form_frame, state="readonly", width=280)
+        self.combo_vehiculo.set("Seleccionar Vehículo")
+        self.combo_vehiculo.pack(fill="x", padx=15, pady=5)
 
-        # Fechas
-        ttk.Label(form, text="Fecha inicio:").grid(row=2, column=0, sticky="w")
-        self.date_inicio = DateEntry(
-            form,
-            width=20,
-            date_pattern="yyyy-mm-dd",
-            state="readonly",
-        )
+        # Fechas (En una fila horizontal)
+        dates_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        dates_frame.pack(fill="x", padx=15, pady=10)
+        
+        # Inicio
+        ctk.CTkLabel(dates_frame, text="Fecha Inicio:").grid(row=0, column=0, sticky="w")
+        self.date_inicio = DateEntry(dates_frame, width=12, date_pattern="yyyy-mm-dd")
+        self.date_inicio.grid(row=1, column=0, sticky="w", pady=2)
+        
+        # Fin
+        ctk.CTkLabel(dates_frame, text="Fecha Fin:").grid(row=0, column=1, sticky="w", padx=(10,0))
+        self.date_fin = DateEntry(dates_frame, width=12, date_pattern="yyyy-mm-dd")
+        self.date_fin.grid(row=1, column=1, sticky="w", pady=2, padx=(10,0))
+        
         self.date_inicio.set_date(date.today())
-        self.date_inicio.grid(row=3, column=0, sticky="w", pady=(0, 8))
-
-        ttk.Label(form, text="Fecha fin:").grid(row=4, column=0, sticky="w")
-        self.date_fin = DateEntry(
-            form,
-            width=20,
-            date_pattern="yyyy-mm-dd",
-            state="readonly",
-        )
         self.date_fin.set_date(date.today())
-        self.date_fin.grid(row=5, column=0, sticky="w", pady=(0, 8))
 
         # Descripción
-        ttk.Label(form, text="Descripción:").grid(row=6, column=0, sticky="w")
-        self.text_descripcion = tk.Text(form, width=40, height=4)
-        self.text_descripcion.grid(row=7, column=0, sticky="w", pady=(0, 8))
+        ctk.CTkLabel(form_frame, text="Descripción del servicio:", anchor="w").pack(fill="x", padx=15, pady=(10,0))
+        self.text_descripcion = ctk.CTkTextbox(form_frame, height=120, corner_radius=5)
+        self.text_descripcion.pack(fill="x", padx=15, pady=5)
 
         # Botones
-        btns = ttk.Frame(form)
-        btns.grid(row=8, column=0, pady=(10, 0), sticky="w")
+        btn_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=10, pady=20)
 
-        ttk.Button(btns, text="Guardar mantenimiento", command=self._guardar_mantenimiento) \
-            .grid(row=0, column=0, padx=(0, 5))
+        ctk.CTkButton(btn_frame, text="Guardar", fg_color="#2cc985", hover_color="#25a970", 
+                      font=ctk.CTkFont(weight="bold"),
+                      command=self._guardar_mantenimiento).pack(fill="x", pady=5)
+        
+        ctk.CTkButton(btn_frame, text="Eliminar", fg_color="#c0392b", hover_color="#a93226", 
+                      command=self._eliminar_mantenimiento).pack(fill="x", pady=5)
+        
+        ctk.CTkButton(btn_frame, text="Limpiar", fg_color="transparent", border_width=1, text_color=("gray10", "gray90"),
+                      command=self._limpiar_formulario).pack(fill="x", pady=5)
 
-        ttk.Button(btns, text="Eliminar mantenimiento", command=self._eliminar_mantenimiento) \
-            .grid(row=0, column=1, padx=5)
-
-        # TABLA
-        tabla_frame = ttk.LabelFrame(body, text="Listado de mantenimientos", padding=10)
-        tabla_frame.grid(row=0, column=1, sticky="nsew")
-        tabla_frame.rowconfigure(0, weight=1)
-        tabla_frame.columnconfigure(0, weight=1)
+        # 2. PANEL DERECHO: TABLA
+        tabla_container = ctk.CTkFrame(body, corner_radius=10)
+        tabla_container.grid(row=0, column=1, sticky="nsew")
+        tabla_container.grid_columnconfigure(0, weight=1)
+        tabla_container.grid_rowconfigure(0, weight=1)
 
         columnas = ("id", "vehiculo", "inicio", "fin", "descripcion")
-        self.tree = ttk.Treeview(
-            tabla_frame,
-            columns=columnas,
-            show="headings",
-            height=15,
-            selectmode="browse",
-        )
+        self.tree = ttk.Treeview(tabla_container, columns=columnas, show="headings", selectmode="browse")
 
-        self.tree.heading("id", text="ID")
-        self.tree.heading("vehiculo", text="Vehículo")
-        self.tree.heading("inicio", text="Inicio")
-        self.tree.heading("fin", text="Fin")
-        self.tree.heading("descripcion", text="Descripción")
+        headers = {"id": "ID", "vehiculo": "Vehículo", "inicio": "Inicio", "fin": "Fin", "descripcion": "Descripción"}
+        for col, txt in headers.items():
+            self.tree.heading(col, text=txt)
 
         self.tree.column("id", width=40, anchor="center")
-        self.tree.column("vehiculo", width=130)
+        self.tree.column("vehiculo", width=150)
         self.tree.column("inicio", width=90, anchor="center")
         self.tree.column("fin", width=90, anchor="center")
-        self.tree.column("descripcion", width=250)
+        self.tree.column("descripcion", width=200)
 
-        self.tree.grid(row=0, column=0, sticky="nsew")
+        self.tree.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        scroll_y = ttk.Scrollbar(
-            tabla_frame,
-            orient="vertical",
-            command=self.tree.yview,
-        )
+        scroll_y = ctk.CTkScrollbar(tabla_container, command=self.tree.yview)
+        scroll_y.grid(row=0, column=1, sticky="ns", pady=10, padx=(0, 5))
         self.tree.configure(yscrollcommand=scroll_y.set)
-        scroll_y.grid(row=0, column=1, sticky="ns")
 
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
@@ -155,19 +162,15 @@ class MantenimientosScreen(ttk.Frame):
     # ----------------------------------------------------------
     def _limpiar_formulario(self):
         self._mantenimiento_actual_id = None
-        self.combo_vehiculo.set("")
+        self.combo_vehiculo.set("Seleccionar Vehículo")
         self.date_inicio.set_date(date.today())
         self.date_fin.set_date(date.today())
-        self.text_descripcion.delete("1.0", tk.END)
+        self.text_descripcion.delete("1.0", "end")
+        
         for sel in self.tree.selection():
             self.tree.selection_remove(sel)
 
-    # ----------------------------------------------------------
     def _cargar_vehiculos_para_combo(self):
-        """
-        Llena el combo de vehículos.
-        Formato: "id - Patente (Marca Modelo)"
-        """
         try:
             vehiculos = VehiculoRepository.listar()
         except Exception as e:
@@ -176,14 +179,13 @@ class MantenimientosScreen(ttk.Frame):
 
         items = []
         for v in vehiculos:
-            if not v.activo:
-                continue
+            if not v.activo: continue
+            # Formato: ID - Patente (Marca Modelo)
             etiqueta = f"{v.id_vehiculo} - {v.patente} ({v.marca} {v.modelo})"
             items.append(etiqueta)
 
-        self.combo_vehiculo["values"] = items
+        self.combo_vehiculo.configure(values=items)
 
-    # ----------------------------------------------------------
     def _cargar_mantenimientos_en_tabla(self):
         for item in self.tree.get_children():
             self.tree.delete(item)
@@ -193,105 +195,75 @@ class MantenimientosScreen(ttk.Frame):
             messagebox.showerror("Error", mantenimientos)
             return
 
-        # Para mostrar algo más legible del vehículo, volvemos a buscarlo
         for m in mantenimientos:
             vehiculo = VehiculoRepository.obtener_por_id(m.id_vehiculo)
-            if vehiculo is not None:
-                txt_veh = f"{vehiculo.patente} ({vehiculo.marca} {vehiculo.modelo})"
-            else:
-                txt_veh = f"Vehículo {m.id_vehiculo}"
+            txt_veh = f"{vehiculo.patente} ({vehiculo.marca})" if vehiculo else f"ID {m.id_vehiculo}"
 
-            self.tree.insert(
-                "",
-                "end",
-                iid=str(m.id_mantenimiento),
-                values=(
-                    m.id_mantenimiento,
-                    txt_veh,
-                    m.fecha_inicio,
-                    m.fecha_fin,
-                    m.descripcion,
-                ),
-            )
+            self.tree.insert("", "end", iid=str(m.id_mantenimiento), values=(
+                m.id_mantenimiento, txt_veh, m.fecha_inicio, m.fecha_fin, m.descripcion
+            ))
 
-    # ----------------------------------------------------------
     def _on_tree_select(self, event):
         sel = self.tree.selection()
-        if not sel:
-            return
+        if not sel: return
 
         item_id = sel[0]
         valores = self.tree.item(item_id, "values")
-
         self._mantenimiento_actual_id = int(valores[0])
 
-        # Buscar el vehículo en el combo que matchee la patente/etiqueta
+        # Buscar el vehículo en el combo
         vehiculo_txt = valores[1]
-        for opt in self.combo_vehiculo["values"]:
-            if vehiculo_txt in opt:
+        for opt in self.combo_vehiculo._values:
+            if vehiculo_txt in opt: # Coincidencia parcial (Patente)
                 self.combo_vehiculo.set(opt)
                 break
 
         # Fechas
         try:
-            f_ini = valores[2]
-            f_fin = valores[3]
-            self.date_inicio.set_date(f_ini)
-            self.date_fin.set_date(f_fin)
-        except Exception:
-            pass
+            self.date_inicio.set_date(valores[2])
+            self.date_fin.set_date(valores[3])
+        except: pass
 
         # Descripción
-        self.text_descripcion.delete("1.0", tk.END)
+        self.text_descripcion.delete("1.0", "end")
         self.text_descripcion.insert("1.0", valores[4])
 
-    # ----------------------------------------------------------
     def _guardar_mantenimiento(self):
         veh_sel = self.combo_vehiculo.get().strip()
-        if not veh_sel:
+        if "Seleccionar" in veh_sel or not veh_sel:
             messagebox.showwarning("Validación", "Seleccioná un vehículo.")
             return
 
         try:
             id_vehiculo = int(veh_sel.split(" - ")[0])
-        except (ValueError, IndexError):
-            messagebox.showwarning("Validación", "No se pudo interpretar el vehículo seleccionado.")
+        except:
+            messagebox.showwarning("Validación", "Error en selección de vehículo.")
             return
 
         f_inicio = self.date_inicio.get_date().isoformat()
         f_fin = self.date_fin.get_date().isoformat()
+        descripcion = self.text_descripcion.get("1.0", "end").strip()
 
-        descripcion = self.text_descripcion.get("1.0", tk.END).strip()
         if not descripcion:
-            messagebox.showwarning("Validación", "La descripción no puede estar vacía.")
+            messagebox.showwarning("Validación", "Descripción requerida.")
             return
 
-        ok, r = MantenimientoService.crear_mantenimiento(
-            id_vehiculo,
-            f_inicio,
-            f_fin,
-            descripcion
-        )
+        ok, r = MantenimientoService.crear_mantenimiento(id_vehiculo, f_inicio, f_fin, descripcion)
 
         if not ok:
             messagebox.showerror("Error", r)
             return
 
-        messagebox.showinfo("OK", "Mantenimiento registrado correctamente.")
+        messagebox.showinfo("OK", "Mantenimiento registrado.")
         self._limpiar_formulario()
         self._cargar_mantenimientos_en_tabla()
 
-    # ----------------------------------------------------------
     def _eliminar_mantenimiento(self):
         if self._mantenimiento_actual_id is None:
             messagebox.showwarning("Atención", "Seleccioná un mantenimiento.")
             return
 
-        if not messagebox.askyesno(
-            "Confirmar",
-            "¿Eliminar este mantenimiento?"
-        ):
-            return
+        if not messagebox.askyesno("Confirmar", "¿Eliminar este mantenimiento?"): return
 
         ok, r = MantenimientoService.eliminar_mantenimiento(self._mantenimiento_actual_id)
         if not ok:

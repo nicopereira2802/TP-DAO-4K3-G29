@@ -1,6 +1,4 @@
-# src/ui/gui/dashboard_screen.py
-
-import tkinter as tk
+import customtkinter as ctk
 from tkinter import ttk
 from datetime import datetime, date
 
@@ -9,11 +7,9 @@ from src.repositories.alquiler_repository import AlquilerRepository
 from src.repositories.mantenimiento_repository import MantenimientoRepository
 
 
-class DashboardScreen(ttk.Frame):
+class DashboardScreen(ctk.CTkFrame):
     """
-    Dashboard con indicadores y tarjetas.
-    - ADMIN: todas las secciones
-    - EMPLEADO: sólo clientes, alquileres, incidentes y mantenimientos
+    Dashboard moderno con indicadores y tarjetas de menú.
     """
 
     def __init__(
@@ -43,130 +39,105 @@ class DashboardScreen(ttk.Frame):
             "Reportes": on_open_reportes,
         }
 
-        self._configurar_estilos()
         self._construir_ui()
 
-    # ----------------------------------------------------------------------
-    # ESTILOS
-    # ----------------------------------------------------------------------
-    def _configurar_estilos(self):
-        style = ttk.Style()
-        self.color_bg = "#EEF1F5"
-        self.card_bg = "#FFFFFF"
-
-        self.card_width = 210
-        self.card_height = 150
-
-        style.configure("Bg.TFrame", background=self.color_bg)
-
-        style.configure(
-            "Card.TFrame",
-            background=self.card_bg,
-            relief="solid",
-            borderwidth=1,
-        )
-
-        style.configure(
-            "CardTitle.TLabel",
-            background=self.card_bg,
-            foreground="#000000",
-            font=("Segoe UI", 12, "bold"),
-        )
-
-        style.configure(
-            "CardDesc.TLabel",
-            background=self.card_bg,
-            foreground="#333333",
-            font=("Segoe UI", 10),
-        )
-
-        style.configure(
-            "Primary.TButton",
-            font=("Segoe UI", 10, "bold"),
-            padding=6,
-        )
-
-        style.configure(
-            "DashboardTitle.TLabel",
-            font=("Segoe UI", 22, "bold"),
-            background=self.color_bg,
-        )
-
-        style.configure(
-            "DashboardSubtitle.TLabel",
-            font=("Segoe UI", 11),
-            background=self.color_bg,
-            foreground="#444",
-        )
-
-    # ----------------------------------------------------------------------
-    # UI
-    # ----------------------------------------------------------------------
     def _construir_ui(self):
-        self.columnconfigure(0, weight=1)
+        # Usamos grid principal
+        self.grid_rowconfigure(1, weight=1) # El cuerpo se expande
+        self.grid_columnconfigure(0, weight=1)
 
         # ---------- HEADER ----------
-        header = ttk.Frame(self, style="Bg.TFrame", padding=20)
+        header = ctk.CTkFrame(self, height=70, corner_radius=0, fg_color=("gray85", "gray20"))
         header.grid(row=0, column=0, sticky="ew")
-        header.columnconfigure(0, weight=1)
-
-        ttk.Label(
+        
+        # Título
+        ctk.CTkLabel(
             header,
-            text="RentaYa - Panel de gestión",
-            style="DashboardTitle.TLabel",
-        ).grid(row=0, column=0, sticky="w")
+            text="Panel de Gestión",
+            font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold")
+        ).pack(side="left", padx=25, pady=15)
 
-        ttk.Button(
+        # Botón Cerrar Sesión
+        ctk.CTkButton(
             header,
             text="Cerrar sesión",
-            style="Primary.TButton",
+            fg_color="#c0392b", # Rojo
+            hover_color="#a93226",
+            width=120,
+            height=35,
             command=self.on_logout,
-        ).grid(row=0, column=2, sticky="e")
+        ).pack(side="right", padx=25)
 
-        ttk.Label(
+        # Info Usuario
+        rol = self.usuario.get('rol', '')
+        nombre = self.usuario.get('nombre_completo', 'Usuario')
+        ctk.CTkLabel(
             header,
-            text=f"{self.usuario.get('nombre_completo', 'Usuario')} ({self.usuario.get('rol', '')})",
-            background=self.color_bg,
-            font=("Segoe UI", 10, "bold"),
-        ).grid(row=0, column=1, sticky="e", padx=10)
+            text=f"{nombre} ({rol})",
+            font=ctk.CTkFont(size=14),
+            text_color=("gray30", "gray70")
+        ).pack(side="right", padx=10)
 
-        # ---------- INDICADORES ----------
-        self._crear_indicadores()
+        # ---------- BODY (Scrollable) ----------
+        # Usamos ScrollableFrame por si la pantalla es chica
+        body = ctk.CTkScrollableFrame(self, corner_radius=0, fg_color="transparent")
+        body.grid(row=1, column=0, sticky="nsew")
+        body.grid_columnconfigure(0, weight=1)
 
-        # ---------- TARJETAS ----------
-        self._crear_cards()
+        # Título Sección Indicadores
+        ctk.CTkLabel(body, text="Estado del Negocio (Hoy)", font=ctk.CTkFont(size=18, weight="bold"), anchor="w").pack(fill="x", padx=30, pady=(20, 10))
 
-        # ---------- FOOTER ----------
-        footer = ttk.Frame(self, style="Bg.TFrame", padding=10)
-        footer.grid(row=3, column=0)
-        ttk.Label(
-            footer,
-            text="Sistema de Alquiler de Vehículos - TP DAO",
-            background=self.color_bg,
-        ).pack()
+        # Indicadores
+        self._crear_indicadores(body)
+
+        # Separador
+        ttk.Separator(body, orient="horizontal").pack(fill="x", padx=30, pady=20)
+
+        # Título Sección Accesos
+        ctk.CTkLabel(body, text="Accesos Rápidos", font=ctk.CTkFont(size=18, weight="bold"), anchor="w").pack(fill="x", padx=30, pady=(0, 10))
+
+        # Menu Cards
+        self._crear_cards(body)
+
+        # Footer
+        ctk.CTkLabel(body, text="Sistema RentaYa v2.0 - TP DAO", text_color="gray").pack(pady=30)
 
     # ----------------------------------------------------------------------
     # INDICADORES
     # ----------------------------------------------------------------------
-    def _crear_indicadores(self):
-        frame = ttk.Frame(self, style="Bg.TFrame", padding=20)
-        frame.grid(row=1, column=0, sticky="ew")
-
-        for i in range(4):
-            frame.columnconfigure(i, weight=1)
-
+    def _crear_indicadores(self, parent):
         data = self._obtener_indicadores()
+        
+        container = ctk.CTkFrame(parent, fg_color="transparent")
+        container.pack(fill="x", padx=20)
+        
+        # Configurar grid de 4 columnas iguales
+        for i in range(4): container.grid_columnconfigure(i, weight=1)
 
-        items = [
-            ("Vehículos disponibles", data["veh_disp"], "#4CAF50"),
-            ("Alquileres abiertos", data["alq_abiertos"], "#FF9800"),
-            ("Vehículos en mantenimiento", data["veh_mant"], "#E67E22"),
-            ("Total vehículos", data["veh_total"], "#3A7AFE"),
-        ]
+        # Crear las 4 tarjetas
+        self._crear_tarjeta_kpi(container, 0, "Disponibles", data["veh_disp"], "#2cc985") # Verde
+        self._crear_tarjeta_kpi(container, 1, "Alquilados", data["alq_abiertos"], "#f39c12") # Naranja
+        self._crear_tarjeta_kpi(container, 2, "Mantenimiento", data["veh_mant"], "#e74c3c") # Rojo
+        self._crear_tarjeta_kpi(container, 3, "Total Flota", data["veh_total"], "#3498db") # Azul
 
-        for col, (title, value, color) in enumerate(items):
-            self._crear_indicador(frame, col, title, value, color)
+    def _crear_tarjeta_kpi(self, parent, col, titulo, valor, color_texto):
+        card = ctk.CTkFrame(parent, corner_radius=15)
+        card.grid(row=0, column=col, padx=10, pady=5, sticky="ew")
+        
+        # Título pequeño arriba
+        ctk.CTkLabel(card, text=titulo, font=ctk.CTkFont(size=14)).pack(pady=(15, 0))
+        
+        # Valor grande en color
+        ctk.CTkLabel(
+            card, 
+            text=str(valor), 
+            font=ctk.CTkFont(size=36, weight="bold"),
+            text_color=color_texto
+        ).pack(pady=(0, 15))
 
+    # ----------------------------------------------------------------------
+    # LÓGICA DE DATOS (Sin cambios, solo adaptada al contexto)
+    # ----------------------------------------------------------------------
     def _parsear_fecha(self, s):
         try:
             return datetime.strptime(s, "%Y-%m-%d").date()
@@ -200,14 +171,7 @@ class DashboardScreen(ttk.Frame):
 
         bloqueados = vehiculos_ocupados | vehiculos_en_mant
 
-        veh_disp = len(
-            [
-                v
-                for v in vehiculos
-                if v.activo and v.id_vehiculo not in bloqueados
-            ]
-        )
-
+        veh_disp = len([v for v in vehiculos if v.activo and v.id_vehiculo not in bloqueados])
         alq_abiertos = len([a for a in alquileres if a.estado == "ABIERTO"])
         veh_mant = len(vehiculos_en_mant)
         veh_total = len(vehiculos)
@@ -219,104 +183,59 @@ class DashboardScreen(ttk.Frame):
             "veh_total": veh_total,
         }
 
-    def _crear_indicador(self, parent, col, titulo, valor, color):
-        frame = ttk.Frame(parent, style="Card.TFrame", padding=15)
-        frame.grid(row=0, column=col, padx=10, sticky="ew")
-
-        ttk.Label(frame, text=titulo, style="CardDesc.TLabel").pack(anchor="w")
-        ttk.Label(
-            frame,
-            text=str(valor),
-            font=("Segoe UI", 20, "bold"),
-            background=self.card_bg,
-            foreground=color,
-        ).pack(anchor="w", pady=(5, 0))
-
     # ----------------------------------------------------------------------
-    # TARJETAS (BOTONES GRANDES)
+    # MENÚ DE TARJETAS
     # ----------------------------------------------------------------------
-    def _crear_cards(self):
-        frame = ttk.Frame(self, style="Bg.TFrame", padding=10)
-        frame.grid(row=2, column=0)
+    def _crear_cards(self, parent):
+        grid_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        grid_frame.pack(fill="x", padx=20)
 
         rol = (self.usuario.get("rol") or "").upper()
 
         if rol == "ADMIN":
-            orden = [
-                "Clientes",
-                "Alquileres",
-                "Incidentes",
-                "Mantenimientos",
-                "Vehículos",
-                "Empleados",
-                "Reportes",
-            ]
+            orden = ["Clientes", "Alquileres", "Incidentes", "Mantenimientos", "Vehículos", "Empleados", "Reportes"]
         else:
-            orden = [
-                "Clientes",
-                "Alquileres",
-                "Incidentes",
-                "Mantenimientos",
-            ]
+            orden = ["Clientes", "Alquileres", "Incidentes", "Mantenimientos"]
 
-        cards = [(titulo, self.actions[titulo]) for titulo in orden]
+        # Configurar columnas (4 columnas max)
+        cols = 4
+        for i in range(cols): grid_frame.grid_columnconfigure(i, weight=1)
 
-        if len(cards) == 7:
-            # layout 3 + 4 (admin)
-            f1 = ttk.Frame(frame, style="Bg.TFrame")
-            f1.grid(row=0, column=0, pady=10)
-            for i in range(3):
-                f1.columnconfigure(i, weight=1)
+        for idx, titulo in enumerate(orden):
+            callback = self.actions.get(titulo)
+            row = idx // cols
+            col = idx % cols
+            
+            if callback:
+                self._crear_boton_menu(grid_frame, row, col, titulo, callback)
 
-            for col, (titulo, callback) in enumerate(cards[:3]):
-                self._crear_card(f1, 0, col, titulo, callback)
-
-            f2 = ttk.Frame(frame, style="Bg.TFrame")
-            f2.grid(row=1, column=0, pady=10)
-            for i in range(4):
-                f2.columnconfigure(i, weight=1)
-
-            for col, (titulo, callback) in enumerate(cards[3:]):
-                self._crear_card(f2, 0, col, titulo, callback)
-        else:
-            # layout genérico para EMPLEADO (hasta 4 tarjetas)
-            cols = 2 if len(cards) <= 4 else 3
-            for i in range(cols):
-                frame.columnconfigure(i, weight=1)
-
-            for idx, (titulo, callback) in enumerate(cards):
-                row = idx // cols
-                col = idx % cols
-                self._crear_card(frame, row, col, titulo, callback)
-
-    def _crear_card(self, parent, row, col, titulo, callback):
-        frame = ttk.Frame(parent, style="Card.TFrame", padding=15)
-        frame.grid(row=row, column=col, padx=20, pady=10, sticky="n")
-
-        frame.grid_propagate(False)
-        frame.configure(width=self.card_width, height=self.card_height)
-
-        ttk.Label(frame, text=titulo, style="CardTitle.TLabel").pack()
-        ttk.Label(
-            frame,
-            text=self._desc_para(titulo),
-            style="CardDesc.TLabel",
-        ).pack(pady=(5, 10))
-
-        ttk.Button(
-            frame,
-            text="Abrir",
-            style="Primary.TButton",
+    def _crear_boton_menu(self, parent, row, col, titulo, callback):
+        # Usamos un botón grande que parezca una tarjeta
+        btn = ctk.CTkButton(
+            parent,
+            text=f"{titulo}\n\n{self._desc_para(titulo)}", # Salto de línea para subtítulo
             command=callback,
-        ).pack()
+            height=100,
+            corner_radius=12,
+            fg_color=("white", "#333333"), # Blanco en light, Gris oscuro en dark
+            text_color=("black", "white"), # Texto opuesto al fondo
+            hover_color=("gray90", "gray25"),
+            font=ctk.CTkFont(size=16, weight="bold"),
+            border_width=1,
+            border_color=("gray80", "gray40")
+        )
+        # Ajuste para que el subtitulo se vea más chico (no soportado nativamente en un solo string, 
+        # pero visualmente funciona bien como bloque)
+        btn.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
 
     def _desc_para(self, titulo):
+        # Descripciones cortas para el subtítulo del botón
         return {
-            "Clientes": "Gestionar clientes",
-            "Alquileres": "Crear y cerrar alquileres",
-            "Incidentes": "Registrar multas o daños",
-            "Mantenimientos": "Servicios del vehículo",
-            "Vehículos": "Flota de vehículos",
-            "Empleados": "Gestión de empleados",
-            "Reportes": "Reportes del negocio",
+            "Clientes": "ABM Clientes",
+            "Alquileres": "Operaciones",
+            "Incidentes": "Multas/Daños",
+            "Mantenimientos": "Taller",
+            "Vehículos": "Flota",
+            "Empleados": "Usuarios",
+            "Reportes": "Estadísticas",
         }.get(titulo, "")
