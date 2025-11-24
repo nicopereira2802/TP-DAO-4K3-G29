@@ -7,12 +7,14 @@ from src.repositories.cliente_repository import ClienteRepository
 
 class ClienteService:
     def __init__(self, repo=None):
+        # Si no me pasan un repo, uso el repositorio por defecto
         self._repo = repo or ClienteRepository
 
     def listar_clientes(self) -> List[Cliente]:
         return self._repo.listar()
 
     def crear_cliente(self, nombre: str, dni: str, email: str, telefono: str) -> Cliente:
+        # Normalizo nombre
         nombre = nombre.strip()
         partes = nombre.split()
         if len(partes) > 1:
@@ -21,6 +23,11 @@ class ClienteService:
         else:
             nombre_pila = nombre
             apellido = ""
+
+        # 👉 Validación básica de email
+        email = email.strip()
+        if "@" not in email or email.startswith("@") or email.endswith("@"):
+            raise Exception("El correo electrónico ingresado no es válido.\nDebe contener un '@' en una posición válida.")
 
         cliente = Cliente(
             id=None,
@@ -65,6 +72,7 @@ class ClienteService:
         if cliente is None:
             raise ValueError(f"Cliente con id {cliente_id} no encontrado")
 
+        # Normalizo nombre
         nombre = nombre.strip()
         partes = nombre.split()
         if len(partes) > 1:
@@ -73,6 +81,11 @@ class ClienteService:
         else:
             nombre_pila = nombre
             apellido = ""
+
+        # 👉 Validación básica de email
+        email = email.strip()
+        if "@" not in email or email.startswith("@") or email.endswith("@"):
+            raise Exception("El correo electrónico ingresado no es válido.\nDebe contener un '@' en una posición válida.")
 
         cliente.nombre = nombre_pila
         cliente.apellido = apellido
