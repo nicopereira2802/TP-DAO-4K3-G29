@@ -1,5 +1,6 @@
 from typing import List
 from sqlite3 import IntegrityError, OperationalError
+import re
 
 from src.domain.cliente import Cliente
 from src.repositories.cliente_repository import ClienteRepository
@@ -7,8 +8,20 @@ from src.repositories.cliente_repository import ClienteRepository
 
 class ClienteService:
     def __init__(self, repo=None):
-        # Si no me pasan un repo, uso el repositorio por defecto
         self._repo = repo or ClienteRepository
+
+    def _validar_nombre_apellido(self, nombre: str, apellido: str):
+        """
+        Valida que nombre y apellido no contengan números ni símbolos raros.
+        Se permiten letras, espacios y acentos.
+        """
+        patron = r"^[A-Za-zÁÉÍÓÚáéíóúÑñ ]*$"
+
+        if not re.match(patron, nombre):
+            raise Exception("El nombre no puede contener números ni caracteres inválidos.")
+
+        if apellido and not re.match(patron, apellido):
+            raise Exception("El apellido no puede contener números ni caracteres inválidos.")
 
     def listar_clientes(self) -> List[Cliente]:
         return self._repo.listar()
@@ -24,7 +37,10 @@ class ClienteService:
             nombre_pila = nombre
             apellido = ""
 
-        # 👉 Validación básica de email
+        # ✅ Validación de nombre y apellido
+        self._validar_nombre_apellido(nombre_pila, apellido)
+
+        # ✅ Validación básica de email
         email = email.strip()
         if "@" not in email or email.startswith("@") or email.endswith("@"):
             raise Exception("El correo electrónico ingresado no es válido.\nDebe contener un '@' en una posición válida.")
@@ -43,17 +59,11 @@ class ClienteService:
             return self._repo.crear(cliente)
 
         except IntegrityError:
-            raise Exception(
-                "Ya existe un cliente registrado con ese DNI.\n"
-                "No se permiten DNI duplicados."
-            )
+            raise Exception("Ya existe un cliente registrado con ese DNI.\nNo se permiten DNI duplicados.")
 
         except OperationalError as e:
             if "database is locked" in str(e).lower():
-                raise Exception(
-                    "La base de datos está ocupada en este momento.\n"
-                    "Cerrá otros programas que la estén usando y volvé a intentar."
-                )
+                raise Exception("La base de datos está ocupada.\nCerrá otros programas y volvé a intentar.")
             raise
 
         except Exception as e:
@@ -68,11 +78,11 @@ class ClienteService:
         telefono: str,
         activo: bool,
     ) -> Cliente:
+
         cliente = self._repo.obtener_por_id(cliente_id)
         if cliente is None:
             raise ValueError(f"Cliente con id {cliente_id} no encontrado")
 
-        # Normalizo nombre
         nombre = nombre.strip()
         partes = nombre.split()
         if len(partes) > 1:
@@ -82,7 +92,10 @@ class ClienteService:
             nombre_pila = nombre
             apellido = ""
 
-        # 👉 Validación básica de email
+        # ✅ Validación de nombre y apellido
+        self._validar_nombre_apellido(nombre_pila, apellido)
+
+        # ✅ Validación básica de email
         email = email.strip()
         if "@" not in email or email.startswith("@") or email.endswith("@"):
             raise Exception("El correo electrónico ingresado no es válido.\nDebe contener un '@' en una posición válida.")
@@ -99,17 +112,11 @@ class ClienteService:
             return cliente
 
         except IntegrityError:
-            raise Exception(
-                "El DNI ingresado ya está asociado a otro cliente.\n"
-                "No se permiten DNI duplicados."
-            )
+            raise Exception("El DNI ingresado ya está asociado a otro cliente.\nNo se permiten DNI duplicados.")
 
         except OperationalError as e:
             if "database is locked" in str(e).lower():
-                raise Exception(
-                    "La base de datos está ocupada en este momento.\n"
-                    "Cerrá otros programas que la estén usando y volvé a intentar."
-                )
+                raise Exception("La base de datos está ocupada.\nCerrá otros programas y volvé a intentar.")
             raise
 
         except Exception as e:
